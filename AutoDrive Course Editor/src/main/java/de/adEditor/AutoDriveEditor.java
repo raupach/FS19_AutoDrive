@@ -101,6 +101,7 @@ public class AutoDriveEditor extends JFrame {
         moveNode = new JToggleButton("Move Nodes");
         moveNode.addActionListener(this.editorListener);
         moveNode.setActionCommand(MOVE_NODES);
+        moveNode.setName(MOVE_NODES);
         buttonPanel.add(moveNode);
 
         connectNodes = new JToggleButton("Connect Nodes");
@@ -112,21 +113,25 @@ public class AutoDriveEditor extends JFrame {
         removeNode = new JToggleButton("Delete Nodes");
         removeNode.addActionListener(this.editorListener);
         removeNode.setActionCommand(REMOVE_NODES);
+        removeNode.setName(REMOVE_NODES);
         buttonPanel.add(removeNode);
 
         removeDestination = new JToggleButton("Delete Destination");
         removeDestination.addActionListener(this.editorListener);
         removeDestination.setActionCommand(REMOVE_DESTINATIONS);
+        removeDestination.setName(REMOVE_DESTINATIONS);
         buttonPanel.add(removeDestination);
 
         createNode = new JToggleButton("Create Node");
         createNode.addActionListener(this.editorListener);
         createNode.setActionCommand(CREATE_NODES);
+        createNode.setName(CREATE_NODES);
         buttonPanel.add(createNode);
 
         createDestination = new JToggleButton("Create Destination");
         createDestination.addActionListener(this.editorListener);
         createDestination.setActionCommand(CREATE_DESTINATIONS);
+        createDestination.setName(CREATE_DESTINATIONS);
         buttonPanel.add(createDestination);
 
         fourTimesMap = new JToggleButton(" 4x");

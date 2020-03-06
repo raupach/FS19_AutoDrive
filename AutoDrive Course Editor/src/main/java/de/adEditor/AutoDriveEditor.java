@@ -1,5 +1,13 @@
 package de.adEditor;
 
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.MapperFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.dataformat.xml.XmlMapper;
+import de.adEditor.routes.RoutesManagerPanel;
+import de.adEditor.routes.dto.AutoDriveRoutesManager;
+import de.adEditor.routes.dto.Route;
+import de.adEditor.routes.dto.RouteExport;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.w3c.dom.Document;
@@ -28,6 +36,7 @@ import java.io.IOException;
 import java.net.URL;
 import java.util.LinkedList;
 import java.util.Map;
+import java.util.Objects;
 import java.util.TreeMap;
 
 public class AutoDriveEditor extends JFrame {
@@ -71,7 +80,7 @@ public class AutoDriveEditor extends JFrame {
 
         LOG.info("AutoDrive start.............................................................................................");
         setTitle(createTitle());
-        setTractorIcon();
+        setIconImage(loadIcon("/tractor.png"));
         addWindowListener(new WindowAdapter() {
             @Override
             public void windowClosing(WindowEvent e) {
@@ -84,17 +93,27 @@ public class AutoDriveEditor extends JFrame {
                 super.windowClosing(e);
             }
         });
-        setLayout(new BorderLayout());
+
+
+        JTabbedPane tabpane = new JTabbedPane (JTabbedPane.TOP,JTabbedPane.SCROLL_TAB_LAYOUT );
+        add(tabpane);
+        JPanel editorPanel = new JPanel();
+        RoutesManagerPanel routesManagerPanel = new RoutesManagerPanel();
+        tabpane.addTab ("Editor", new ImageIcon(Objects.requireNonNull(loadIcon("/note_edit.png"))) , editorPanel);
+        tabpane.addTab("Network Manager", new ImageIcon(Objects.requireNonNull(loadIcon("/note_go.png"))), routesManagerPanel);
+
+        editorPanel.setLayout(new BorderLayout());
 
         // create a new panel with GridBagLayout manager
         mapPanel = new MapPanel(this);
 
         // set border for the panel
-        mapPanel.setBorder(BorderFactory.createTitledBorder(
-                BorderFactory.createEtchedBorder(), "Map Panel"));
+        mapPanel.setBorder(BorderFactory.createTitledBorder(BorderFactory.createEtchedBorder(), "Map Panel"));
+        mapPanel.setPreferredSize(new Dimension(1024, 768));
+        mapPanel.setMinimumSize(new Dimension(1024, 768));
 
         // add the panel to this frame
-        add(mapPanel, BorderLayout.CENTER);
+        editorPanel.add(mapPanel, BorderLayout.CENTER);
 
         EditorListener editorListener = new EditorListener(this);
 
@@ -183,23 +202,23 @@ public class AutoDriveEditor extends JFrame {
         nodeBoxSetEnabled(false);
         mapBoxSetEnabled(false);
 
-        this.add(buttonPanel, BorderLayout.NORTH);
+        editorPanel.add(buttonPanel, BorderLayout.NORTH);
 
         pack();
         setLocationRelativeTo(null);
         this.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
     }
 
-    private void setTractorIcon() {
+    private BufferedImage loadIcon(String name) {
         try {
-            URL url = AutoDriveEditor.class.getResource("/tractor.png");
+            URL url = AutoDriveEditor.class.getResource(name);
             if (url != null) {
-                BufferedImage tractorImage = ImageIO.read(url);
-                setIconImage(tractorImage);
+                return ImageIO.read(url);
             }
         } catch (IOException e) {
             LOG.error(e.getMessage(), e);
         }
+        return null;
     }
 
     private void nodeBoxSetEnabled(boolean enabled) {
@@ -639,6 +658,35 @@ public class AutoDriveEditor extends JFrame {
         mapPanel.setMapZoomFactor(zoomFactor);
         mapPanel.repaint();
     }
+
+
+    private void readXmlRoutes (){
+
+        try {
+            ObjectMapper mapper = new XmlMapper();
+            mapper.configure(MapperFeature.ACCEPT_CASE_INSENSITIVE_PROPERTIES, true);
+            mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+            String directory = "/home/raupach/AutoDriveEditor_TestData/autoDrive/routesManager/";
+            String routesManagerPath = directory+ "routes.xml";
+            String routesDirectory = directory+ "routes/";
+
+            AutoDriveRoutesManager autoDrive = mapper.readValue(new File(routesManagerPath), AutoDriveRoutesManager.class);
+
+            for (Route route: autoDrive.getRoutes()) {
+                RouteExport routeExport = mapper.readValue(new File(routesDirectory + route.getFileName()), RouteExport.class);
+                int x = 1;
+            }
+
+
+
+        } catch (IOException e) {
+            LOG.error(e.getMessage(), e);
+        }
+
+
+    }
+
+
 
     private String createTitle() {
         StringBuilder sb = new StringBuilder();

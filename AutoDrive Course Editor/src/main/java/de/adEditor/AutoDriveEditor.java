@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.MapperFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.xml.XmlMapper;
+import com.formdev.flatlaf.FlatLightLaf;
 import de.adEditor.routes.RoutesManagerPanel;
 import de.adEditor.routes.dto.AutoDriveRoutesManager;
 import de.adEditor.routes.dto.Route;
@@ -270,7 +271,7 @@ public class AutoDriveEditor extends JFrame {
     public static void main(String[] args) {
         // set look and feel to the system look and feel
         try {
-            UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
+            UIManager.setLookAndFeel(new FlatLightLaf());
         } catch (Exception ex) {
             LOG.error(ex.getMessage(), ex);
         }

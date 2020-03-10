@@ -5,7 +5,7 @@ import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlProperty;
 public class Marker {
 
     @JacksonXmlProperty(isAttribute = true, localName = "i")
-    private Long id;
+    private Integer waypointIndex;
 
     @JacksonXmlProperty(isAttribute = true, localName = "n")
     private String name;
@@ -13,13 +13,6 @@ public class Marker {
     @JacksonXmlProperty(isAttribute = true, localName = "g")
     private String group;
 
-    public Long getId() {
-        return id;
-    }
-
-    public void setId(Long id) {
-        this.id = id;
-    }
 
     public String getName() {
         return name;
@@ -35,5 +28,13 @@ public class Marker {
 
     public void setGroup(String group) {
         this.group = group;
+    }
+
+    public Integer getWaypointIndex() {
+        return waypointIndex;
+    }
+
+    public void setWaypointIndex(Integer waypointIndex) {
+        this.waypointIndex = waypointIndex;
     }
 }

@@ -1,14 +1,7 @@
 package de.adEditor;
 
-import com.fasterxml.jackson.databind.DeserializationFeature;
-import com.fasterxml.jackson.databind.MapperFeature;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.dataformat.xml.XmlMapper;
 import com.formdev.flatlaf.FlatLightLaf;
 import de.adEditor.routes.RoutesManagerPanel;
-import de.adEditor.routes.dto.AutoDriveRoutesManager;
-import de.adEditor.routes.dto.Route;
-import de.adEditor.routes.dto.RouteExport;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.w3c.dom.Document;
@@ -659,35 +652,6 @@ public class AutoDriveEditor extends JFrame {
         mapPanel.setMapZoomFactor(zoomFactor);
         mapPanel.repaint();
     }
-
-
-    private void readXmlRoutes (){
-
-        try {
-            ObjectMapper mapper = new XmlMapper();
-            mapper.configure(MapperFeature.ACCEPT_CASE_INSENSITIVE_PROPERTIES, true);
-            mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
-            String directory = "/home/raupach/AutoDriveEditor_TestData/autoDrive/routesManager/";
-            String routesManagerPath = directory+ "routes.xml";
-            String routesDirectory = directory+ "routes/";
-
-            AutoDriveRoutesManager autoDrive = mapper.readValue(new File(routesManagerPath), AutoDriveRoutesManager.class);
-
-            for (Route route: autoDrive.getRoutes()) {
-                RouteExport routeExport = mapper.readValue(new File(routesDirectory + route.getFileName()), RouteExport.class);
-                int x = 1;
-            }
-
-
-
-        } catch (IOException e) {
-            LOG.error(e.getMessage(), e);
-        }
-
-
-    }
-
-
 
     private String createTitle() {
         StringBuilder sb = new StringBuilder();

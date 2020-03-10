@@ -1,16 +1,39 @@
 package de.adEditor.routes;
 
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.MapperFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.dataformat.xml.XmlMapper;
+import de.adEditor.routes.dto.AutoDriveRoutesManager;
+import de.adEditor.routes.dto.Route;
+import de.adEditor.routes.dto.RouteExport;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import javax.swing.*;
-import javax.swing.filechooser.FileNameExtensionFilter;
+import javax.swing.event.TableModelListener;
+import javax.swing.table.TableModel;
 import java.awt.*;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
 import java.net.URL;
+import java.util.List;
 import java.util.Properties;
+import java.util.concurrent.ExecutionException;
 
-public class RoutesManagerPanel extends JPanel {
+public class RoutesManagerPanel extends JPanel implements ActionListener {
+
+    private static Logger LOG = LoggerFactory.getLogger(RoutesManagerPanel.class);
+
+    private final static String directory = "/home/raupach/AutoDriveEditor_TestData/autoDrive/routesManager/";
+    private final static String routesManagerPath = directory+ "routes.xml";
+    private final static String routesDirectory = directory+ "routes/";
+
+    private JTable lokalTable;
 
     public RoutesManagerPanel() {
         super(new BorderLayout());
@@ -19,8 +42,43 @@ public class RoutesManagerPanel extends JPanel {
         addButtons(toolBar);
 
 //        setPreferredSize(new Dimension(450, 130));
-        add(toolBar, BorderLayout.PAGE_START);
+//        add(toolBar, BorderLayout.PAGE_START);
+        createTable();
+    }
 
+    private void createTable() {
+
+        AutoDriveRoutesManager autoDriveRoutesManager = readXmlRoutesMetaData();
+        AutoDriveRoutesTableModel autoDriveRoutesTableModel = new AutoDriveRoutesTableModel(autoDriveRoutesManager.getRoutes());
+
+        JPanel panelLeft = new JPanel();
+        panelLeft.setLayout(new BorderLayout());
+        JLabel lokalText = new JLabel("Lokal Routes:", JLabel.CENTER);
+        lokalText.setPreferredSize(new Dimension(200, 50));
+        panelLeft.add(lokalText, BorderLayout.NORTH);
+
+        JPanel panelRight= new JPanel();
+        panelRight.setLayout(new BorderLayout());
+        JLabel remoteText = new JLabel("Remote Routes:", JLabel.CENTER);
+        remoteText.setPreferredSize(new Dimension(200, 50));
+        panelRight.add(remoteText, BorderLayout.NORTH);
+
+
+        JPopupMenu localPopupMenu = new JPopupMenu();
+        JMenuItem menuItemUpload = new JMenuItem("Upload");
+        menuItemUpload.setActionCommand("UPLOAD");
+        menuItemUpload.addActionListener(this);
+        localPopupMenu.add(menuItemUpload);
+
+        lokalTable = new JTable(autoDriveRoutesTableModel);
+        lokalTable.setComponentPopupMenu(localPopupMenu);
+
+        panelLeft.add(new JScrollPane(lokalTable));
+        panelRight.add(new JScrollPane(new JTable(autoDriveRoutesTableModel)));
+
+        JSplitPane splitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, panelLeft, panelRight);
+        splitPane.setDividerLocation(0.5);
+        add(splitPane);
     }
 
 
@@ -102,4 +160,129 @@ public class RoutesManagerPanel extends JPanel {
         }
     }
 
+
+    private AutoDriveRoutesManager readXmlRoutesMetaData() {
+
+        try {
+            ObjectMapper mapper = new XmlMapper();
+            mapper.configure(MapperFeature.ACCEPT_CASE_INSENSITIVE_PROPERTIES, true);
+            mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+
+            return mapper.readValue(new File(routesManagerPath), AutoDriveRoutesManager.class);
+        } catch (IOException e) {
+            LOG.error(e.getMessage(), e);
+            return null;
+        }
+    }
+
+    private RouteExport readXmlRouteData(String fileName) {
+
+        try {
+            ObjectMapper mapper = new XmlMapper();
+            mapper.configure(MapperFeature.ACCEPT_CASE_INSENSITIVE_PROPERTIES, true);
+            mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+
+            return mapper.readValue(new File(routesDirectory + fileName), RouteExport.class);
+
+        } catch (IOException e) {
+            LOG.error(e.getMessage(), e);
+            return null;
+        }
+    }
+
+    @Override
+    public void actionPerformed(ActionEvent actionEvent) {
+        if (actionEvent.getActionCommand().equals("UPLOAD")) {
+            int row = lokalTable.getSelectedRow();
+            String fileName = (String) lokalTable.getValueAt(row, 1);
+            RouteExport routeExport = readXmlRouteData(fileName);
+
+            try {
+                HttpClient httpClient = new HttpClient();
+                httpClient.upload(routeExport, (String)lokalTable.getValueAt(row, 0), (String)lokalTable.getValueAt(row, 2), (Integer)lokalTable.getValueAt(row, 3), (String)lokalTable.getValueAt(row, 4));
+            } catch (Exception e) {
+                LOG.error(e.getMessage(), e);
+            }
+
+        }
+    }
+
+
+    private class AutoDriveRoutesTableModel implements TableModel {
+
+        private List<Route> routes;
+
+        public AutoDriveRoutesTableModel(List<Route> routes) {
+            this.routes = routes;
+        }
+
+        @Override
+        public int getRowCount() {
+            return routes.size();
+        }
+
+        @Override
+        public int getColumnCount() {
+            return 5;
+        }
+
+        @Override
+        public String getColumnName(int i) {
+            switch (i){
+                case 0: return "name";
+                case 1: return "fileName";
+                case 2: return "map";
+                case 3: return "revision";
+                case 4: return "date";
+                default: return null;
+            }
+        }
+
+        @Override
+        public Class<?> getColumnClass(int i) {
+            switch( i ){
+                case 0:
+                case 4:
+                case 1:
+                case 2:
+                    return String.class;
+                case 3: return Integer.class;
+                default: return null;
+            }
+        }
+
+        @Override
+        public boolean isCellEditable(int rowIndex, int columnIndex) {
+            return false;
+        }
+
+        @Override
+        public Object getValueAt(int rowIndex, int columnIndex) {
+            Route route = routes.get(rowIndex);
+
+            switch( columnIndex ){
+                case 0: return route.getName();
+                case 1: return route.getFileName();
+                case 2: return route.getMap();
+                case 3: return route.getRevision();
+                case 4: return route.getDate();
+                default: return null;
+            }
+        }
+
+        @Override
+        public void setValueAt(Object o, int i, int i1) {
+
+        }
+
+        @Override
+        public void addTableModelListener(TableModelListener tableModelListener) {
+
+        }
+
+        @Override
+        public void removeTableModelListener(TableModelListener tableModelListener) {
+
+        }
+    }
 }

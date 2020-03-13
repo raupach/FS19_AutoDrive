@@ -1,5 +1,6 @@
 package de.adEditor.routes.dto;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlProperty;
 
 import java.util.Date;
@@ -18,7 +19,8 @@ public class Route {
     private Integer revision;
 
     @JacksonXmlProperty(isAttribute = true)
-    private String date;
+    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy/MM/dd hh:mm:ss")
+    private Date date;
 
 
     public String getName() {
@@ -53,12 +55,11 @@ public class Route {
         this.revision = revision;
     }
 
-
-    public String getDate() {
+    public Date getDate() {
         return date;
     }
 
-    public void setDate(String date) {
+    public void setDate(Date date) {
         this.date = date;
     }
 }

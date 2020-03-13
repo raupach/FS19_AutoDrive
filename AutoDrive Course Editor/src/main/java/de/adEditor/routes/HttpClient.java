@@ -1,14 +1,12 @@
 package de.adEditor.routes;
 
 import com.google.gson.Gson;
-import de.adEditor.routes.dto.Group;
-import de.adEditor.routes.dto.Marker;
-import de.adEditor.routes.dto.RouteExport;
-import de.adEditor.routes.dto.Waypoints;
-import de.autoDrive.NetworkServer.rest.dto_v1.GroupDto;
-import de.autoDrive.NetworkServer.rest.dto_v1.MarkerDto;
-import de.autoDrive.NetworkServer.rest.dto_v1.RoutesRequestDto;
-import de.autoDrive.NetworkServer.rest.dto_v1.WaypointDto;
+import de.adEditor.routes.dto.*;
+import de.adEditor.routes.events.GetRoutesEvent;
+import de.adEditor.routes.events.HttpClientEventListener;
+import de.adEditor.routes.events.UploadCompletedEvent;
+import de.autoDrive.NetworkServer.rest.RoutesRestPath;
+import de.autoDrive.NetworkServer.rest.dto_v1.*;
 import org.apache.hc.client5.http.async.methods.SimpleHttpRequest;
 import org.apache.hc.client5.http.async.methods.SimpleHttpRequests;
 import org.apache.hc.client5.http.async.methods.SimpleHttpResponse;
@@ -17,12 +15,20 @@ import org.apache.hc.client5.http.impl.async.HttpAsyncClients;
 import org.apache.hc.core5.concurrent.FutureCallback;
 import org.apache.hc.core5.http.ContentType;
 import org.apache.hc.core5.http.HttpHost;
-import org.apache.hc.core5.io.CloseMode;
 import org.apache.hc.core5.reactor.IOReactorConfig;
 import org.apache.hc.core5.util.Timeout;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-import java.net.URISyntaxException;
+import javax.swing.event.EventListenerList;
+import java.io.IOException;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
+import java.util.Date;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
@@ -31,97 +37,71 @@ import java.util.stream.Collectors;
 
 public class HttpClient {
 
-    public void request() throws URISyntaxException, ExecutionException, InterruptedException {
-        IOReactorConfig ioReactorConfig = IOReactorConfig.custom()
-                .setSoTimeout(Timeout.ofSeconds(5))
-                .build();
+    private DateTimeFormatter formatter = DateTimeFormatter.ofPattern(RoutesRestPath.DATE_FORMAT);
+    private Gson gson = new Gson();
+    private EventListenerList listenerList = new EventListenerList();
+    private IOReactorConfig ioReactorConfig = IOReactorConfig.custom().setSoTimeout(Timeout.ofSeconds(300)).build();
+    private static Logger LOG = LoggerFactory.getLogger(HttpClient.class);
 
-        CloseableHttpAsyncClient client = HttpAsyncClients.custom()
-                .setIOReactorConfig(ioReactorConfig)
-                .build();
 
-        client.start();
-
-        HttpHost target = new HttpHost("localhost", 8080);
-        String[] requestUris = new String[]{"/", "/ip", "/user-agent", "/headers"};
-
-        for (String requestUri : requestUris) {
-            SimpleHttpRequest httpget = SimpleHttpRequests.get(target, requestUri);
-            System.out.println("Executing request " + httpget.getMethod() + " " + httpget.getUri());
-            Future<SimpleHttpResponse> future = client.execute(
-                    httpget,
-                    new FutureCallback<SimpleHttpResponse>() {
-
-                        @Override
-                        public void completed(final SimpleHttpResponse response) {
-                            System.out.println(requestUri + "->" + response.getCode());
-                            System.out.println(response.getBody());
-                        }
-
-                        @Override
-                        public void failed(final Exception ex) {
-                            System.out.println(requestUri + "->" + ex);
-                        }
-
-                        @Override
-                        public void cancelled() {
-                            System.out.println(requestUri + " cancelled");
-                        }
-
-                    });
-            future.get();
-        }
-
-        System.out.println("Shutting down");
-        client.close(CloseMode.GRACEFUL);
+    public void addMyEventListener(HttpClientEventListener listener) {
+        listenerList.add(HttpClientEventListener.class, listener);
     }
 
-    public void upload(RouteExport routeExport, String name, String map, Integer revision, String date) throws ExecutionException, InterruptedException {
+    public void removeMyEventListener(HttpClientEventListener listener) {
+        listenerList.remove(HttpClientEventListener.class, listener);
+    }
 
-        RoutesRequestDto dto = toDto(routeExport,  name,  map,  revision,  date);
+    public void upload(RouteExport routeExport, String name, String map, Integer revision, Date date) throws ExecutionException, InterruptedException, IOException {
 
-        IOReactorConfig ioReactorConfig = IOReactorConfig.custom()
-                .setSoTimeout(Timeout.ofSeconds(5))
-                .build();
-
-        CloseableHttpAsyncClient client = HttpAsyncClients.custom()
-                .setIOReactorConfig(ioReactorConfig)
-                .build();
-
-        client.start();
+        long start = System.currentTimeMillis();
+        RoutesRequestDto dto = toDto(routeExport, name, map, revision, date);
 
         HttpHost target = new HttpHost("localhost", 8080);
-        SimpleHttpRequest httppost = SimpleHttpRequests.post(target, "/autodrive");
-        Gson gson = new Gson();
+        SimpleHttpRequest httppost = SimpleHttpRequests.post(target, RoutesRestPath.CONTEXT_PATH + "/" + RoutesRestPath.ROUTES);
+
         String body = gson.toJson(dto);
         httppost.setBody(body, ContentType.APPLICATION_JSON);
-        Future<SimpleHttpResponse> future = client.execute(  httppost,
-                new FutureCallback<SimpleHttpResponse>() {
+        try (CloseableHttpAsyncClient client = HttpAsyncClients.custom().setIOReactorConfig(ioReactorConfig).build()) {
+            client.start();
+            Future<SimpleHttpResponse> future = client.execute(httppost, new FutureCallback<>() {
 
-                    @Override
-                    public void completed(final SimpleHttpResponse response) {
-                    }
+                @Override
+                public void completed(SimpleHttpResponse response) {
+                    long end = System.currentTimeMillis();
+                    RoutesStoreResponseDto routesStoreResponseDto = gson.fromJson(response.getBodyText(), RoutesStoreResponseDto.class);
+                    LOG.info("completed: {} at {}ms", response.getCode(), end - start);
+                    fireUploadCompletedEvent(new UploadCompletedEvent(routesStoreResponseDto));
+                }
 
-                    @Override
-                    public void failed(final Exception ex) {
-                    }
+                @Override
+                public void failed(Exception ex) {
+                    LOG.error(ex.getMessage(), ex);
+                }
 
-                    @Override
-                    public void cancelled() {
-                    }
+                @Override
+                public void cancelled() {
+                    long end = System.currentTimeMillis();
+                    LOG.error("cancelled: {}ms", end - start);
+                }
 
-                });
-        future.get();
+            });
+            SimpleHttpResponse simpleHttpResponse = future.get();
+
+            long end = System.currentTimeMillis();
+            LOG.info("Upload response: {} at {}ms", simpleHttpResponse.getCode(), end - start);
+        }
     }
 
-    private RoutesRequestDto toDto(RouteExport routeExport, String name, String map, Integer revision, String date) {
+    private RoutesRequestDto toDto(RouteExport routeExport, String name, String map, Integer revision, Date date) {
         RoutesRequestDto dto = new RoutesRequestDto();
-        dto.setDate(date);
+        dto.setDate(ZonedDateTime.ofInstant(date.toInstant(), ZoneId.systemDefault()).format(formatter));
         dto.setName(name);
+        dto.setMap(map);
         dto.setRevision(revision);
         dto.setGroups(routeExport.getGroups().stream().map(group -> toGroupDto(group)).collect(Collectors.toList()));
         dto.setMarkers(routeExport.getMarkers().stream().map(m -> toMarkerDto(m)).collect(Collectors.toList()));
-        dto.setWaypoints(toWaypointDtos (routeExport.getWaypoints()));
+        dto.setWaypoints(toWaypointDtos(routeExport.getWaypoints()));
         return dto;
     }
 
@@ -138,8 +118,7 @@ public class HttpClient {
         String[] z = waypoints.getZ().split(";");
         String[] out = waypoints.getOut().split(";");
 
-        for (int i=0; i<dtos.size(); i++)
-        {
+        for (int i = 0; i < dtos.size(); i++) {
             WaypointDto dto = dtos.get(i);
             dto.setY(Double.valueOf(y[i]));
             dto.setZ(Double.valueOf(z[i]));
@@ -167,4 +146,72 @@ public class HttpClient {
     }
 
 
+    public void getRoutes() throws ExecutionException, InterruptedException, IOException {
+
+        HttpHost target = new HttpHost("localhost", 8080);
+        SimpleHttpRequest httpget = SimpleHttpRequests.get(target, RoutesRestPath.CONTEXT_PATH + "/" + RoutesRestPath.ROUTES);
+        try (CloseableHttpAsyncClient client = HttpAsyncClients.custom().setIOReactorConfig(ioReactorConfig).build()) {
+            client.start();
+            Future<SimpleHttpResponse> future = client.execute(httpget, new FutureCallback<>() {
+
+                @Override
+                public void completed(SimpleHttpResponse response) {
+                    String bodyText = response.getBodyText();
+                    RoutesResponseDtos routesResponseDtos = gson.fromJson(bodyText, RoutesResponseDtos.class);
+                    List<Route> route = toRoute(routesResponseDtos);
+                    fireGetRouteEvent(new GetRoutesEvent(route));
+                }
+
+                @Override
+                public void failed(Exception ex) {
+                    LOG.error(ex.getMessage(), ex);
+                }
+
+                @Override
+                public void cancelled() {
+                    LOG.error("getRoutes cancelled.");
+                }
+
+            });
+            SimpleHttpResponse simpleHttpResponse = future.get();
+            LOG.info("Upload response: {}", simpleHttpResponse.getCode());
+        }
+    }
+
+
+    void fireGetRouteEvent(GetRoutesEvent evt) {
+        Object[] listeners = listenerList.getListenerList();
+        for (int i = 0; i < listeners.length; i = i + 2) {
+            if (listeners[i] == HttpClientEventListener.class) {
+                ((HttpClientEventListener) listeners[i + 1]).getRoutes(evt);
+            }
+        }
+    }
+
+    void fireUploadCompletedEvent(UploadCompletedEvent evt) {
+        Object[] listeners = listenerList.getListenerList();
+        for (int i = 0; i < listeners.length; i = i + 2) {
+            if (listeners[i] == HttpClientEventListener.class) {
+                ((HttpClientEventListener) listeners[i + 1]).getUploadRouteResponse(evt);
+            }
+        }
+    }
+
+    private List<Route> toRoute(RoutesResponseDtos routesResponseDtos) {
+        return routesResponseDtos.getRoutes().stream().map(this::toRoute).collect(Collectors.toList());
+    }
+
+    private Route toRoute(RouteDto dto) {
+        Route route = new Route();
+        SimpleDateFormat sdf = new SimpleDateFormat(RoutesRestPath.DATE_FORMAT);
+        try {
+            route.setDate(sdf.parse(dto.getDate()));
+        } catch (ParseException e) {
+            LOG.error(e.getMessage(),e);
+        }
+        route.setMap(dto.getMap());
+        route.setRevision(dto.getRevision());
+        route.setName(dto.getName());
+        return route;
+    }
 }

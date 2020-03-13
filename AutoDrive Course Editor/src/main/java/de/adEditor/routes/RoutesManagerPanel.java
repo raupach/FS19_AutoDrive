@@ -7,6 +7,9 @@ import com.fasterxml.jackson.dataformat.xml.XmlMapper;
 import de.adEditor.routes.dto.AutoDriveRoutesManager;
 import de.adEditor.routes.dto.Route;
 import de.adEditor.routes.dto.RouteExport;
+import de.adEditor.routes.events.GetRoutesEvent;
+import de.adEditor.routes.events.HttpClientEventListener;
+import de.adEditor.routes.events.UploadCompletedEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -21,9 +24,12 @@ import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
 import java.net.URL;
+import java.util.Date;
 import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public class RoutesManagerPanel extends JPanel implements ActionListener {
 
@@ -33,10 +39,25 @@ public class RoutesManagerPanel extends JPanel implements ActionListener {
     private final static String routesManagerPath = directory+ "routes.xml";
     private final static String routesDirectory = directory+ "routes/";
 
+    private HttpClient httpClient = new HttpClient();
+    ExecutorService executorService = Executors.newFixedThreadPool(10);
+
     private JTable lokalTable;
 
     public RoutesManagerPanel() {
         super(new BorderLayout());
+
+        httpClient.addMyEventListener(new HttpClientEventListener() {
+            @Override
+            public void getRoutes(GetRoutesEvent evt) {
+                int x =1;
+            }
+
+            @Override
+            public void getUploadRouteResponse(UploadCompletedEvent evt) {
+                int y=1;
+            }
+        });
 
         JToolBar toolBar = new JToolBar("Still draggable");
         addButtons(toolBar);
@@ -44,7 +65,21 @@ public class RoutesManagerPanel extends JPanel implements ActionListener {
 //        setPreferredSize(new Dimension(450, 130));
 //        add(toolBar, BorderLayout.PAGE_START);
         createTable();
+        reloadServerRoutes();
     }
+
+    private void reloadServerRoutes() {
+
+        Runnable runnableTask = () -> {
+            try {
+                httpClient.getRoutes();
+            } catch (ExecutionException | InterruptedException | IOException e) {
+                LOG.error(e.getMessage(), e);
+            }
+        };
+        executorService.execute(runnableTask);
+    }
+
 
     private void createTable() {
 
@@ -197,12 +232,14 @@ public class RoutesManagerPanel extends JPanel implements ActionListener {
             String fileName = (String) lokalTable.getValueAt(row, 1);
             RouteExport routeExport = readXmlRouteData(fileName);
 
-            try {
-                HttpClient httpClient = new HttpClient();
-                httpClient.upload(routeExport, (String)lokalTable.getValueAt(row, 0), (String)lokalTable.getValueAt(row, 2), (Integer)lokalTable.getValueAt(row, 3), (String)lokalTable.getValueAt(row, 4));
-            } catch (Exception e) {
-                LOG.error(e.getMessage(), e);
-            }
+            Runnable runnableTask = () -> {
+                try {
+                    httpClient.upload(routeExport, (String)lokalTable.getValueAt(row, 0), (String)lokalTable.getValueAt(row, 2), (Integer)lokalTable.getValueAt(row, 3), (Date)lokalTable.getValueAt(row, 4));
+                } catch (ExecutionException | InterruptedException | IOException e) {
+                    LOG.error(e.getMessage(), e);
+                }
+            };
+            executorService.execute(runnableTask);
 
         }
     }
@@ -242,11 +279,10 @@ public class RoutesManagerPanel extends JPanel implements ActionListener {
         public Class<?> getColumnClass(int i) {
             switch( i ){
                 case 0:
-                case 4:
                 case 1:
-                case 2:
-                    return String.class;
+                case 2: return String.class;
                 case 3: return Integer.class;
+                case 4: return Date.class;
                 default: return null;
             }
         }

@@ -10,12 +10,11 @@ import de.adEditor.routes.dto.RouteExport;
 import de.adEditor.routes.events.GetRoutesEvent;
 import de.adEditor.routes.events.HttpClientEventListener;
 import de.adEditor.routes.events.UploadCompletedEvent;
+import de.autoDrive.NetworkServer.rest.dto_v1.RouteDto;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.swing.*;
-import javax.swing.event.TableModelListener;
-import javax.swing.table.TableModel;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
@@ -43,6 +42,7 @@ public class RoutesManagerPanel extends JPanel implements ActionListener {
     ExecutorService executorService = Executors.newFixedThreadPool(10);
 
     private JTable lokalTable;
+    private JTable remoteTable;
 
     public RoutesManagerPanel() {
         super(new BorderLayout());
@@ -50,7 +50,7 @@ public class RoutesManagerPanel extends JPanel implements ActionListener {
         httpClient.addMyEventListener(new HttpClientEventListener() {
             @Override
             public void getRoutes(GetRoutesEvent evt) {
-                int x =1;
+                remoteTable.setModel(new AutoDriveRemoteRoutesTableModel((List<RouteDto>) evt.getSource()));
             }
 
             @Override
@@ -108,8 +108,10 @@ public class RoutesManagerPanel extends JPanel implements ActionListener {
         lokalTable = new JTable(autoDriveRoutesTableModel);
         lokalTable.setComponentPopupMenu(localPopupMenu);
 
+        remoteTable = new JTable(new AutoDriveRemoteRoutesTableModel());
+
         panelLeft.add(new JScrollPane(lokalTable));
-        panelRight.add(new JScrollPane(new JTable(autoDriveRoutesTableModel)));
+        panelRight.add(new JScrollPane(remoteTable));
 
         JSplitPane splitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, panelLeft, panelRight);
         splitPane.setDividerLocation(0.5);
@@ -244,81 +246,4 @@ public class RoutesManagerPanel extends JPanel implements ActionListener {
         }
     }
 
-
-    private class AutoDriveRoutesTableModel implements TableModel {
-
-        private List<Route> routes;
-
-        public AutoDriveRoutesTableModel(List<Route> routes) {
-            this.routes = routes;
-        }
-
-        @Override
-        public int getRowCount() {
-            return routes.size();
-        }
-
-        @Override
-        public int getColumnCount() {
-            return 5;
-        }
-
-        @Override
-        public String getColumnName(int i) {
-            switch (i){
-                case 0: return "name";
-                case 1: return "fileName";
-                case 2: return "map";
-                case 3: return "revision";
-                case 4: return "date";
-                default: return null;
-            }
-        }
-
-        @Override
-        public Class<?> getColumnClass(int i) {
-            switch( i ){
-                case 0:
-                case 1:
-                case 2: return String.class;
-                case 3: return Integer.class;
-                case 4: return Date.class;
-                default: return null;
-            }
-        }
-
-        @Override
-        public boolean isCellEditable(int rowIndex, int columnIndex) {
-            return false;
-        }
-
-        @Override
-        public Object getValueAt(int rowIndex, int columnIndex) {
-            Route route = routes.get(rowIndex);
-
-            switch( columnIndex ){
-                case 0: return route.getName();
-                case 1: return route.getFileName();
-                case 2: return route.getMap();
-                case 3: return route.getRevision();
-                case 4: return route.getDate();
-                default: return null;
-            }
-        }
-
-        @Override
-        public void setValueAt(Object o, int i, int i1) {
-
-        }
-
-        @Override
-        public void addTableModelListener(TableModelListener tableModelListener) {
-
-        }
-
-        @Override
-        public void removeTableModelListener(TableModelListener tableModelListener) {
-
-        }
-    }
 }

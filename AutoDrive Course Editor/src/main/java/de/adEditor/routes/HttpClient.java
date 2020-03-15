@@ -41,6 +41,10 @@ public class HttpClient {
     private Gson gson = new Gson();
     private EventListenerList listenerList = new EventListenerList();
     private IOReactorConfig ioReactorConfig = IOReactorConfig.custom().setSoTimeout(Timeout.ofSeconds(300)).build();
+
+//    private HttpHost target = new HttpHost("localhost", 8080);
+    private HttpHost target = new HttpHost("autodrive.si12.de", 8294);
+
     private static Logger LOG = LoggerFactory.getLogger(HttpClient.class);
 
 
@@ -57,7 +61,6 @@ public class HttpClient {
         long start = System.currentTimeMillis();
         RoutesRequestDto dto = toDto(routeExport, name, map, revision, date);
 
-        HttpHost target = new HttpHost("localhost", 8080);
         SimpleHttpRequest httppost = SimpleHttpRequests.post(target, RoutesRestPath.CONTEXT_PATH + "/" + RoutesRestPath.ROUTES);
 
         String body = gson.toJson(dto);
@@ -148,7 +151,6 @@ public class HttpClient {
 
     public void getRoutes() throws ExecutionException, InterruptedException, IOException {
 
-        HttpHost target = new HttpHost("localhost", 8080);
         SimpleHttpRequest httpget = SimpleHttpRequests.get(target, RoutesRestPath.CONTEXT_PATH + "/" + RoutesRestPath.ROUTES);
         try (CloseableHttpAsyncClient client = HttpAsyncClients.custom().setIOReactorConfig(ioReactorConfig).build()) {
             client.start();
@@ -158,8 +160,8 @@ public class HttpClient {
                 public void completed(SimpleHttpResponse response) {
                     String bodyText = response.getBodyText();
                     RoutesResponseDtos routesResponseDtos = gson.fromJson(bodyText, RoutesResponseDtos.class);
-                    List<Route> route = toRoute(routesResponseDtos);
-                    fireGetRouteEvent(new GetRoutesEvent(route));
+//                    List<Route> route = toRoute(routesResponseDtos);
+                    fireGetRouteEvent(new GetRoutesEvent(routesResponseDtos.getRoutes()));
                 }
 
                 @Override

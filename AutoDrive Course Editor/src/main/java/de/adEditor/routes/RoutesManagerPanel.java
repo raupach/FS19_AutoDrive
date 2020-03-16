@@ -16,13 +16,12 @@ import org.slf4j.LoggerFactory;
 
 import javax.swing.*;
 import java.awt.*;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
 import java.net.URL;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.Properties;
@@ -30,7 +29,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-public class RoutesManagerPanel extends JPanel implements ActionListener {
+public class RoutesManagerPanel extends JPanel {
 
     private static Logger LOG = LoggerFactory.getLogger(RoutesManagerPanel.class);
 
@@ -39,7 +38,7 @@ public class RoutesManagerPanel extends JPanel implements ActionListener {
     private final static String routesDirectory = directory+ "routes/";
 
     private HttpClient httpClient = new HttpClient();
-    ExecutorService executorService = Executors.newFixedThreadPool(10);
+    private ExecutorService executorService = Executors.newFixedThreadPool(10);
 
     private JTable lokalTable;
     private JTable remoteTable;
@@ -54,13 +53,18 @@ public class RoutesManagerPanel extends JPanel implements ActionListener {
             }
 
             @Override
+            public void getWaypoints(GetRoutesEvent evt) {
+                Object s = evt.getSource();
+            }
+
+            @Override
             public void getUploadRouteResponse(UploadCompletedEvent evt) {
-                int y=1;
+
             }
         });
 
-        JToolBar toolBar = new JToolBar("Still draggable");
-        addButtons(toolBar);
+//        JToolBar toolBar = new JToolBar("Still draggable");
+//        addButtons(toolBar);
 
 //        setPreferredSize(new Dimension(450, 130));
 //        add(toolBar, BorderLayout.PAGE_START);
@@ -80,35 +84,38 @@ public class RoutesManagerPanel extends JPanel implements ActionListener {
         executorService.execute(runnableTask);
     }
 
+    private void downloadFullRoute() {
+        int rowIndex = remoteTable.getSelectedRow();
+        AutoDriveRemoteRoutesTableModel model = (AutoDriveRemoteRoutesTableModel) remoteTable.getModel();
+        RouteDto routeDto = model.get(rowIndex);
+        downloadWaypointsForRoute(routeDto.getId());
+
+    }
+
+
+    private void downloadWaypointsForRoute(String routeId) {
+
+        Runnable runnableTask = () -> {
+            try {
+                httpClient.getWaypoints(routeId);
+            } catch (ExecutionException | InterruptedException | IOException e) {
+                LOG.error(e.getMessage(), e);
+            }
+        };
+        executorService.execute(runnableTask);
+    }
 
     private void createTable() {
 
+        JPanel panelLeft = createLeftPanel();
+        JPanel panelRight = createRightPanel();
+
         AutoDriveRoutesManager autoDriveRoutesManager = readXmlRoutesMetaData();
-        AutoDriveRoutesTableModel autoDriveRoutesTableModel = new AutoDriveRoutesTableModel(autoDriveRoutesManager.getRoutes());
-
-        JPanel panelLeft = new JPanel();
-        panelLeft.setLayout(new BorderLayout());
-        JLabel lokalText = new JLabel("Lokal Routes:", JLabel.CENTER);
-        lokalText.setPreferredSize(new Dimension(200, 50));
-        panelLeft.add(lokalText, BorderLayout.NORTH);
-
-        JPanel panelRight= new JPanel();
-        panelRight.setLayout(new BorderLayout());
-        JLabel remoteText = new JLabel("Remote Routes:", JLabel.CENTER);
-        remoteText.setPreferredSize(new Dimension(200, 50));
-        panelRight.add(remoteText, BorderLayout.NORTH);
-
-
-        JPopupMenu localPopupMenu = new JPopupMenu();
-        JMenuItem menuItemUpload = new JMenuItem("Upload");
-        menuItemUpload.setActionCommand("UPLOAD");
-        menuItemUpload.addActionListener(this);
-        localPopupMenu.add(menuItemUpload);
-
-        lokalTable = new JTable(autoDriveRoutesTableModel);
-        lokalTable.setComponentPopupMenu(localPopupMenu);
+        lokalTable = new JTable(new AutoDriveLocalRoutesTableModel(autoDriveRoutesManager != null ? autoDriveRoutesManager.getRoutes() : new ArrayList<>()));
+        lokalTable.setComponentPopupMenu(createLocalRoutesPopupMenu());
 
         remoteTable = new JTable(new AutoDriveRemoteRoutesTableModel());
+        remoteTable.setComponentPopupMenu(createRemoteRoutesPopupMenu());
 
         panelLeft.add(new JScrollPane(lokalTable));
         panelRight.add(new JScrollPane(remoteTable));
@@ -116,6 +123,97 @@ public class RoutesManagerPanel extends JPanel implements ActionListener {
         JSplitPane splitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, panelLeft, panelRight);
         splitPane.setDividerLocation(0.5);
         add(splitPane);
+    }
+
+    private JPopupMenu createLocalRoutesPopupMenu() {
+        JPopupMenu localPopupMenu = new JPopupMenu();
+
+        JMenuItem menuItemUpload = new JMenuItem("Upload");
+        menuItemUpload.addActionListener(e ->{
+            startUploadRoute();
+        });
+        localPopupMenu.add(menuItemUpload);
+
+        JMenuItem menuItemRefresh = new JMenuItem("Refresh");
+        menuItemRefresh.addActionListener(e ->{
+            AutoDriveRoutesManager autoDriveRoutesManager = readXmlRoutesMetaData();
+            lokalTable.setModel(new AutoDriveLocalRoutesTableModel(autoDriveRoutesManager != null ? autoDriveRoutesManager.getRoutes() : new ArrayList<>()));
+        });
+        localPopupMenu.add(menuItemRefresh);
+
+        return localPopupMenu;
+    }
+
+    private JPopupMenu createRemoteRoutesPopupMenu() {
+        JPopupMenu localPopupMenu = new JPopupMenu();
+
+        JMenuItem menuItemDownload = new JMenuItem("Download");
+        menuItemDownload.addActionListener(e -> downloadFullRoute());
+        localPopupMenu.add(menuItemDownload);
+
+        JMenuItem menuItemRefresh = new JMenuItem("Refresh");
+        menuItemRefresh.addActionListener(e ->reloadServerRoutes());
+        localPopupMenu.add(menuItemRefresh);
+
+        return localPopupMenu;
+    }
+
+    private JPanel createRightPanel() {
+        JPanel panelRight= new JPanel();
+        panelRight.setLayout(new BorderLayout());
+
+        JPanel topBoxPanel = new JPanel();
+        topBoxPanel.setLayout(new BoxLayout(topBoxPanel, BoxLayout.LINE_AXIS));
+        topBoxPanel.setBorder(BorderFactory.createEmptyBorder(15, 20, 10, 10));
+
+        JLabel remoteText = new JLabel("Remote Routes:", JLabel.LEFT);
+        topBoxPanel.add(remoteText);
+        topBoxPanel.add(Box.createRigidArea(new Dimension(30, 0)));
+
+        JButton refreshRemoteTable = new JButton();
+        refreshRemoteTable.setIcon(new ImageIcon(getImageUrl("arrow_refresh.png"), "refresh"));
+        topBoxPanel.add(refreshRemoteTable);
+        topBoxPanel.add(Box.createRigidArea(new Dimension(10, 0)));
+        refreshRemoteTable.addActionListener(actionEvent -> reloadServerRoutes());
+
+        JButton downloadRemoteRoute = new JButton();
+        downloadRemoteRoute.setIcon(new ImageIcon(getImageUrl("arrow_down.png"), "download"));
+        topBoxPanel.add(downloadRemoteRoute);
+
+        panelRight.add(topBoxPanel, BorderLayout.NORTH);
+
+        return panelRight;
+    }
+
+
+    private JPanel createLeftPanel() {
+        JPanel panelRight= new JPanel();
+        panelRight.setLayout(new BorderLayout());
+
+        JPanel topBoxPanel = new JPanel();
+        topBoxPanel.setLayout(new BoxLayout(topBoxPanel, BoxLayout.LINE_AXIS));
+        topBoxPanel.setBorder(BorderFactory.createEmptyBorder(15, 20, 10, 10));
+
+        JLabel remoteText = new JLabel("Lokal Routes:", JLabel.LEFT);
+        topBoxPanel.add(remoteText);
+        topBoxPanel.add(Box.createRigidArea(new Dimension(30, 0)));
+
+        JButton refreshLocalTable = new JButton();
+        refreshLocalTable.setIcon(new ImageIcon(getImageUrl("arrow_refresh.png"), "refresh"));
+        topBoxPanel.add(refreshLocalTable);
+        topBoxPanel.add(Box.createRigidArea(new Dimension(10, 0)));
+        refreshLocalTable.addActionListener(actionEvent -> {
+            AutoDriveRoutesManager autoDriveRoutesManager = readXmlRoutesMetaData();
+            lokalTable.setModel(new AutoDriveLocalRoutesTableModel(autoDriveRoutesManager != null ? autoDriveRoutesManager.getRoutes() : new ArrayList<>()));
+        });
+
+        JButton downloadRemoteRoute = new JButton();
+        downloadRemoteRoute.setIcon(new ImageIcon(getImageUrl("arrow_up.png"), "upload"));
+        topBoxPanel.add(downloadRemoteRoute);
+
+        panelRight.add(topBoxPanel, BorderLayout.NORTH);
+
+        return panelRight;
     }
 
 
@@ -161,6 +259,10 @@ public class RoutesManagerPanel extends JPanel implements ActionListener {
         return button;
     }
 
+    private URL getImageUrl(String imageName) {
+        String imgLocation = "/icons/" +imageName;
+        return RoutesManagerPanel.class.getResource(imgLocation);
+    }
 
     private void checkAndLoadProperties (){
         File configFile = new File("adEditor.config");
@@ -227,23 +329,21 @@ public class RoutesManagerPanel extends JPanel implements ActionListener {
         }
     }
 
-    @Override
-    public void actionPerformed(ActionEvent actionEvent) {
-        if (actionEvent.getActionCommand().equals("UPLOAD")) {
-            int row = lokalTable.getSelectedRow();
-            String fileName = (String) lokalTable.getValueAt(row, 1);
-            RouteExport routeExport = readXmlRouteData(fileName);
 
-            Runnable runnableTask = () -> {
-                try {
-                    httpClient.upload(routeExport, (String)lokalTable.getValueAt(row, 0), (String)lokalTable.getValueAt(row, 2), (Integer)lokalTable.getValueAt(row, 3), (Date)lokalTable.getValueAt(row, 4));
-                } catch (ExecutionException | InterruptedException | IOException e) {
-                    LOG.error(e.getMessage(), e);
-                }
-            };
-            executorService.execute(runnableTask);
+    private void startUploadRoute() {
+        int row = lokalTable.getSelectedRow();
+        AutoDriveLocalRoutesTableModel model = (AutoDriveLocalRoutesTableModel) lokalTable.getModel();
+        Route route = model.get(row);
+        RouteExport routeExport = readXmlRouteData(route.getFileName());
 
-        }
+        Runnable runnableTask = () -> {
+            try {
+                httpClient.upload(routeExport, route.getName(), route.getMap(), route.getRevision(), route.getDate());
+            } catch (ExecutionException | InterruptedException | IOException e) {
+                LOG.error(e.getMessage(), e);
+            }
+        };
+        executorService.execute(runnableTask);
     }
 
 }

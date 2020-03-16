@@ -42,8 +42,8 @@ public class HttpClient {
     private EventListenerList listenerList = new EventListenerList();
     private IOReactorConfig ioReactorConfig = IOReactorConfig.custom().setSoTimeout(Timeout.ofSeconds(300)).build();
 
-//    private HttpHost target = new HttpHost("localhost", 8080);
-    private HttpHost target = new HttpHost("autodrive.si12.de", 8294);
+    private HttpHost target = new HttpHost("localhost", 8080);
+//    private HttpHost target = new HttpHost("autodrive.si12.de", 8294);
 
     private static Logger LOG = LoggerFactory.getLogger(HttpClient.class);
 
@@ -180,12 +180,50 @@ public class HttpClient {
         }
     }
 
+    public void getWaypoints(String routeId) throws ExecutionException, InterruptedException, IOException {
+
+        SimpleHttpRequest httpget = SimpleHttpRequests.get(target, RoutesRestPath.CONTEXT_PATH + RoutesRestPath.ROUTES+"/"+routeId+ "/" +RoutesRestPath.WAYPOINTS);
+        try (CloseableHttpAsyncClient client = HttpAsyncClients.custom().setIOReactorConfig(ioReactorConfig).build()) {
+            client.start();
+            Future<SimpleHttpResponse> future = client.execute(httpget, new FutureCallback<>() {
+
+                @Override
+                public void completed(SimpleHttpResponse response) {
+                    String bodyText = response.getBodyText();
+                    WaypointsResponseDto waypointsResponseDto = gson.fromJson(bodyText, WaypointsResponseDto.class);
+                    fireGetWayointsEvent(new GetRoutesEvent(waypointsResponseDto.getWaypoints()));
+                }
+
+                @Override
+                public void failed(Exception ex) {
+                    LOG.error(ex.getMessage(), ex);
+                }
+
+                @Override
+                public void cancelled() {
+                    LOG.error("getRoutes cancelled.");
+                }
+
+            });
+            SimpleHttpResponse simpleHttpResponse = future.get();
+            LOG.info("Upload response: {}", simpleHttpResponse.getCode());
+        }
+    }
 
     void fireGetRouteEvent(GetRoutesEvent evt) {
         Object[] listeners = listenerList.getListenerList();
         for (int i = 0; i < listeners.length; i = i + 2) {
             if (listeners[i] == HttpClientEventListener.class) {
                 ((HttpClientEventListener) listeners[i + 1]).getRoutes(evt);
+            }
+        }
+    }
+
+    void fireGetWayointsEvent(GetRoutesEvent evt) {
+        Object[] listeners = listenerList.getListenerList();
+        for (int i = 0; i < listeners.length; i = i + 2) {
+            if (listeners[i] == HttpClientEventListener.class) {
+                ((HttpClientEventListener) listeners[i + 1]).getWaypoints(evt);
             }
         }
     }

@@ -8,12 +8,16 @@ import javax.swing.table.TableModel;
 import java.util.Date;
 import java.util.List;
 
-public class AutoDriveRoutesTableModel implements TableModel {
+public class AutoDriveLocalRoutesTableModel implements TableModel {
 
     private List<Route> routes;
 
-    public AutoDriveRoutesTableModel(List<Route> routes) {
+    public AutoDriveLocalRoutesTableModel(List<Route> routes) {
         this.routes = routes;
+    }
+
+    public Route get(int index) {
+        return routes.get(index);
     }
 
     @Override
@@ -23,7 +27,7 @@ public class AutoDriveRoutesTableModel implements TableModel {
 
     @Override
     public int getColumnCount() {
-        return 5;
+        return 4;
     }
 
     @Override
@@ -32,12 +36,10 @@ public class AutoDriveRoutesTableModel implements TableModel {
             case 0:
                 return "name";
             case 1:
-                return "fileName";
-            case 2:
                 return "map";
-            case 3:
+            case 2:
                 return "revision";
-            case 4:
+            case 3:
                 return "date";
             default:
                 return null;
@@ -49,11 +51,10 @@ public class AutoDriveRoutesTableModel implements TableModel {
         switch (i) {
             case 0:
             case 1:
-            case 2:
                 return String.class;
-            case 3:
+            case 2:
                 return Integer.class;
-            case 4:
+            case 3:
                 return Date.class;
             default:
                 return null;
@@ -73,12 +74,10 @@ public class AutoDriveRoutesTableModel implements TableModel {
             case 0:
                 return route.getName();
             case 1:
-                return route.getFileName();
-            case 2:
                 return route.getMap();
-            case 3:
+            case 2:
                 return route.getRevision();
-            case 4:
+            case 3:
                 return route.getDate();
             default:
                 return null;

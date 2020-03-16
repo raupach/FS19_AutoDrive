@@ -26,6 +26,10 @@ public class AutoDriveRemoteRoutesTableModel implements TableModel {
         this.routes = routes;
     }
 
+    public RouteDto get(int index) {
+        return routes.get(index);
+    }
+
     @Override
     public int getRowCount() {
         return routes.size();

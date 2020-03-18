@@ -5,20 +5,12 @@ import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlProperty;
 public class Waypoints {
 
     @JacksonXmlProperty(isAttribute = true)
-    private String c;
+    private Integer c;
     private String x;
     private String y;
     private String z;
     private String in;
     private String out;
-
-    public String getC() {
-        return c;
-    }
-
-    public void setC(String c) {
-        this.c = c;
-    }
 
     public String getX() {
         return x;
@@ -58,5 +50,13 @@ public class Waypoints {
 
     public void setOut(String out) {
         this.out = out;
+    }
+
+    public Integer getC() {
+        return c;
+    }
+
+    public void setC(Integer c) {
+        this.c = c;
     }
 }

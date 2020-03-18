@@ -3,14 +3,17 @@ package de.adEditor.routes;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.MapperFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.dataformat.xml.XmlMapper;
-import de.adEditor.routes.dto.AutoDriveRoutesManager;
-import de.adEditor.routes.dto.Route;
-import de.adEditor.routes.dto.RouteExport;
+import de.adEditor.routes.dto.*;
 import de.adEditor.routes.events.GetRoutesEvent;
 import de.adEditor.routes.events.HttpClientEventListener;
 import de.adEditor.routes.events.UploadCompletedEvent;
+import de.autoDrive.NetworkServer.rest.RoutesRestPath;
 import de.autoDrive.NetworkServer.rest.dto_v1.RouteDto;
+import de.autoDrive.NetworkServer.rest.dto_v1.WaypointDto;
+import de.autoDrive.NetworkServer.rest.dto_v1.WaypointsResponseDto;
+import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -21,13 +24,14 @@ import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
 import java.net.URL;
-import java.util.ArrayList;
-import java.util.Date;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.*;
 import java.util.List;
-import java.util.Properties;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.stream.Collectors;
 
 public class RoutesManagerPanel extends JPanel {
 
@@ -54,7 +58,24 @@ public class RoutesManagerPanel extends JPanel {
 
             @Override
             public void getWaypoints(GetRoutesEvent evt) {
-                Object s = evt.getSource();
+                WaypointsResponseDto waypointsResponseDto = (WaypointsResponseDto) evt.getSource();
+                String filename = writeXmlRouteData(toRouteExport(waypointsResponseDto));
+
+                AutoDriveRoutesManager autoDriveRoutesManager = readXmlRoutesMetaData();
+                Route newRoute = new Route();
+                newRoute.setName(waypointsResponseDto.getRoute().getName());
+                newRoute.setRevision(waypointsResponseDto.getRoute().getRevision());
+                newRoute.setMap(waypointsResponseDto.getRoute().getMap());
+                SimpleDateFormat sdf = new SimpleDateFormat(RoutesRestPath.DATE_FORMAT);
+                try {
+                    newRoute.setDate(sdf.parse(waypointsResponseDto.getRoute().getDate()));
+                } catch (ParseException e) {
+                    LOG.error(e.getMessage(),e);
+                }
+                newRoute.setFileName(filename);
+                newRoute.setServerId(waypointsResponseDto.getRoute().getId());
+                Objects.requireNonNull(autoDriveRoutesManager).getRoutes().add(newRoute);
+                writeXmlRoutesMetaData(autoDriveRoutesManager, filename);
             }
 
             @Override
@@ -70,6 +91,44 @@ public class RoutesManagerPanel extends JPanel {
 //        add(toolBar, BorderLayout.PAGE_START);
         createTable();
         reloadServerRoutes();
+    }
+
+    private RouteExport toRouteExport(WaypointsResponseDto waypointsResponseDto) {
+        RouteExport routeExport = new RouteExport();
+        List<Double> x = new ArrayList<>();
+        List<Double> y = new ArrayList<>();
+        List<Double> z = new ArrayList<>();
+        List<String> out = new ArrayList<>();
+        List<WaypointDto> waypointDtos = waypointsResponseDto.getWaypoints();
+        Map<Integer,List<Integer>> inMap = new HashMap<>();
+
+        waypointDtos.forEach(waypointDto -> {
+
+            x.add(waypointDto.getX());
+            y.add(waypointDto.getY());
+            z.add(waypointDto.getZ());
+
+            out.add(StringUtils.join(waypointDto.getOut(), ","));
+
+            waypointDto.getOut().forEach(i ->{
+                List<Integer> in = inMap.computeIfAbsent(i, k -> new ArrayList<>());
+                in.add((waypointDtos.indexOf(waypointDto))+1);
+            });
+
+        });
+
+        Waypoints waypoints = new Waypoints();
+        waypoints.setC(waypointsResponseDto.getWaypoints().size());
+        waypoints.setX(StringUtils.join(x, ";"));
+        waypoints.setY(StringUtils.join(y, ";"));
+        waypoints.setZ(StringUtils.join(z, ";"));
+        waypoints.setOut(StringUtils.join(out, ";"));
+        waypoints.setIn(StringUtils.join(inMap.values().stream().map(inIndex -> StringUtils.join(inIndex, ",")).collect(Collectors.toList()),";"));
+
+        routeExport.setWaypoints(waypoints);
+        routeExport.setGroups(waypointsResponseDto.getGroups().stream().map(g -> new Group(g.getName())).collect(Collectors.toList()));
+        routeExport.setMarkers(waypointsResponseDto.getMarkers().stream().map(m -> new Marker(m.getName(), m.getGroup(), m.getWaypointIndex())).collect(Collectors.toList()));
+        return routeExport;
     }
 
     private void reloadServerRoutes() {
@@ -314,6 +373,19 @@ public class RoutesManagerPanel extends JPanel {
         }
     }
 
+    private void writeXmlRoutesMetaData(AutoDriveRoutesManager autoDriveRoutesManager, String filename) {
+
+        try {
+            ObjectMapper mapper = new XmlMapper().enable(SerializationFeature.INDENT_OUTPUT);
+            mapper.configure(MapperFeature.ACCEPT_CASE_INSENSITIVE_PROPERTIES, true);
+            mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+
+            mapper.writeValue(new File(routesManagerPath), autoDriveRoutesManager);
+        } catch (IOException e) {
+            LOG.error(e.getMessage(), e);
+        }
+    }
+
     private RouteExport readXmlRouteData(String fileName) {
 
         try {
@@ -329,6 +401,21 @@ public class RoutesManagerPanel extends JPanel {
         }
     }
 
+    private String writeXmlRouteData(RouteExport routeExport) {
+
+        try {
+            String fileName = UUID.randomUUID().toString()+".xml";
+            ObjectMapper mapper = new XmlMapper().enable(SerializationFeature.INDENT_OUTPUT);
+            mapper.configure(MapperFeature.ACCEPT_CASE_INSENSITIVE_PROPERTIES, true);
+            mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+
+            mapper.writeValue(new File(routesDirectory + fileName), routeExport);
+            return fileName;
+        } catch (IOException e) {
+            LOG.error(e.getMessage(), e);
+            return null;
+        }
+    }
 
     private void startUploadRoute() {
         int row = lokalTable.getSelectedRow();

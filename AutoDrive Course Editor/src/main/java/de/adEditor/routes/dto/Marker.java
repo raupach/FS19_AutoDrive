@@ -13,6 +13,14 @@ public class Marker {
     @JacksonXmlProperty(isAttribute = true, localName = "g")
     private String group;
 
+    public Marker() {
+    }
+
+    public Marker(String name, String group, Integer waypointIndex) {
+        this.name = name;
+        this.group = group;
+        this.waypointIndex = waypointIndex;
+    }
 
     public String getName() {
         return name;

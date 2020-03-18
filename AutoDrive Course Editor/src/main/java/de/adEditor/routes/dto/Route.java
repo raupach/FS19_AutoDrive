@@ -22,6 +22,7 @@ public class Route {
     @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy/MM/dd hh:mm:ss")
     private Date date;
 
+    private String serverId;
 
     public String getName() {
         return name;
@@ -61,5 +62,13 @@ public class Route {
 
     public void setDate(Date date) {
         this.date = date;
+    }
+
+    public String getServerId() {
+        return serverId;
+    }
+
+    public void setServerId(String serverId) {
+        this.serverId = serverId;
     }
 }

@@ -191,7 +191,7 @@ public class HttpClient {
                 public void completed(SimpleHttpResponse response) {
                     String bodyText = response.getBodyText();
                     WaypointsResponseDto waypointsResponseDto = gson.fromJson(bodyText, WaypointsResponseDto.class);
-                    fireGetWayointsEvent(new GetRoutesEvent(waypointsResponseDto.getWaypoints()));
+                    fireGetWayointsEvent(new GetRoutesEvent(waypointsResponseDto));
                 }
 
                 @Override

@@ -5,12 +5,16 @@ import de.adEditor.routes.dto.Route;
 
 import javax.swing.event.TableModelListener;
 import javax.swing.table.TableModel;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 
 public class AutoDriveLocalRoutesTableModel implements TableModel {
 
-    private List<Route> routes;
+    private List<Route> routes = new ArrayList<>();
+
+    public AutoDriveLocalRoutesTableModel() {
+    }
 
     public AutoDriveLocalRoutesTableModel(List<Route> routes) {
         this.routes = routes;

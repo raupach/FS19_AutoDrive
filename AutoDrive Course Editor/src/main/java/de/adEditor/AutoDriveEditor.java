@@ -1,6 +1,9 @@
 package de.adEditor;
 
 import com.formdev.flatlaf.FlatLightLaf;
+import de.adEditor.config.AdConfiguration;
+import de.adEditor.config.ConfigDialog;
+import de.adEditor.helper.IconHelper;
 import de.adEditor.routes.RoutesManagerPanel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -30,7 +33,6 @@ import java.io.IOException;
 import java.net.URL;
 import java.util.LinkedList;
 import java.util.Map;
-import java.util.Objects;
 import java.util.TreeMap;
 
 public class AutoDriveEditor extends JFrame {
@@ -50,6 +52,7 @@ public class AutoDriveEditor extends JFrame {
     public static final String AUTO_DRIVE_COURSE_EDITOR_TITLE = "AutoDrive Course Editor 0.1";
 
     private MapPanel mapPanel;
+    private RoutesManagerPanel routesManagerPanel;
     private JButton saveButton;
     private JButton loadImageButton;
     private JToggleButton removeNode;
@@ -75,6 +78,8 @@ public class AutoDriveEditor extends JFrame {
         LOG.info("AutoDrive start.............................................................................................");
         setTitle(createTitle());
         setIconImage(loadIcon("/tractor.png"));
+        setJMenuBar(createMenuBar());
+
         addWindowListener(new WindowAdapter() {
             @Override
             public void windowClosing(WindowEvent e) {
@@ -88,13 +93,21 @@ public class AutoDriveEditor extends JFrame {
             }
         });
 
+        addWindowListener(new WindowAdapter() {
+            @Override
+            public void windowOpened(WindowEvent e) {
+                checkAndLoadProperties();
+            }
+
+        });
+
 
         JTabbedPane tabpane = new JTabbedPane (JTabbedPane.TOP,JTabbedPane.SCROLL_TAB_LAYOUT );
         add(tabpane);
         JPanel editorPanel = new JPanel();
-        RoutesManagerPanel routesManagerPanel = new RoutesManagerPanel();
-        tabpane.addTab ("Editor", new ImageIcon(Objects.requireNonNull(loadIcon("/note_edit.png"))) , editorPanel);
-        tabpane.addTab("Network Manager", new ImageIcon(Objects.requireNonNull(loadIcon("/note_go.png"))), routesManagerPanel);
+        routesManagerPanel = new RoutesManagerPanel();
+        tabpane.addTab("Course Editor", new ImageIcon(IconHelper.getImageUrl("note_edit.png")) , editorPanel);
+        tabpane.addTab("Network Manager", new ImageIcon(IconHelper.getImageUrl("note_go.png")), routesManagerPanel);
 
         editorPanel.setLayout(new BorderLayout());
 
@@ -201,6 +214,22 @@ public class AutoDriveEditor extends JFrame {
         pack();
         setLocationRelativeTo(null);
         this.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+    }
+
+    private JMenuBar createMenuBar() {
+        JMenuBar menuBar = new JMenuBar();
+        JMenu menu = new JMenu("Editor");
+        menuBar.add(menu);
+
+        JMenuItem menuConfigItem = new JMenuItem("Configuration");
+        menuConfigItem.addActionListener(e ->showConfigDialog());
+        menu.add(menuConfigItem);
+
+        JMenuItem menuQuitItem = new JMenuItem("Quit");
+        menuQuitItem.addActionListener(e -> System.exit(0));
+        menu.add(menuQuitItem);
+
+        return menuBar;
     }
 
     private BufferedImage loadIcon(String name) {
@@ -681,4 +710,23 @@ public class AutoDriveEditor extends JFrame {
         }
     }
 
+
+    private void checkAndLoadProperties() {
+        File configFile = new File(AdConfiguration.CONFIG_FILE_NAME);
+        if (configFile.exists()) {
+            AdConfiguration.getInstance().readConfigFile();
+        } else {
+            showConfigDialog();
+        }
+        routesManagerPanel.reloadXMLRouteMetaData();
+    }
+
+    private void showConfigDialog() {
+        ConfigDialog configDialog = new ConfigDialog(this, true);
+        configDialog.setVisible(true);
+        ConfigDialog.DIALOG_STATE dialog_state = configDialog.getState();
+        if (dialog_state.equals(ConfigDialog.DIALOG_STATE.OK)) {
+            AdConfiguration.getInstance().writeConfigFile();
+        }
+    }
 }

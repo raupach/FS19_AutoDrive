@@ -5,6 +5,8 @@ import com.fasterxml.jackson.databind.MapperFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.dataformat.xml.XmlMapper;
+import de.adEditor.config.AdConfiguration;
+import de.adEditor.helper.IconHelper;
 import de.adEditor.routes.dto.*;
 import de.adEditor.routes.events.GetRoutesEvent;
 import de.adEditor.routes.events.HttpClientEventListener;
@@ -20,14 +22,12 @@ import org.slf4j.LoggerFactory;
 import javax.swing.*;
 import java.awt.*;
 import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.FileReader;
 import java.io.IOException;
 import java.net.URL;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
-import java.util.*;
 import java.util.List;
+import java.util.*;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -37,9 +37,9 @@ public class RoutesManagerPanel extends JPanel {
 
     private static Logger LOG = LoggerFactory.getLogger(RoutesManagerPanel.class);
 
-    private final static String directory = "/home/raupach/AutoDriveEditor_TestData/autoDrive/routesManager/";
-    private final static String routesManagerPath = directory+ "routes.xml";
-    private final static String routesDirectory = directory+ "routes/";
+    private final static String directory = "/autoDrive/routesManager";
+    private final static String routesManagerPath = directory + "/routes.xml";
+    private final static String routesDirectory = directory + "/routes/";
 
     private HttpClient httpClient = new HttpClient();
     private ExecutorService executorService = Executors.newFixedThreadPool(10);
@@ -169,8 +169,7 @@ public class RoutesManagerPanel extends JPanel {
         JPanel panelLeft = createLeftPanel();
         JPanel panelRight = createRightPanel();
 
-        AutoDriveRoutesManager autoDriveRoutesManager = readXmlRoutesMetaData();
-        lokalTable = new JTable(new AutoDriveLocalRoutesTableModel(autoDriveRoutesManager != null ? autoDriveRoutesManager.getRoutes() : new ArrayList<>()));
+        lokalTable = new JTable(new AutoDriveLocalRoutesTableModel());
         lokalTable.setComponentPopupMenu(createLocalRoutesPopupMenu());
 
         remoteTable = new JTable(new AutoDriveRemoteRoutesTableModel());
@@ -195,8 +194,7 @@ public class RoutesManagerPanel extends JPanel {
 
         JMenuItem menuItemRefresh = new JMenuItem("Refresh");
         menuItemRefresh.addActionListener(e ->{
-            AutoDriveRoutesManager autoDriveRoutesManager = readXmlRoutesMetaData();
-            lokalTable.setModel(new AutoDriveLocalRoutesTableModel(autoDriveRoutesManager != null ? autoDriveRoutesManager.getRoutes() : new ArrayList<>()));
+            reloadXMLRouteMetaData();
         });
         localPopupMenu.add(menuItemRefresh);
 
@@ -230,13 +228,13 @@ public class RoutesManagerPanel extends JPanel {
         topBoxPanel.add(Box.createRigidArea(new Dimension(30, 0)));
 
         JButton refreshRemoteTable = new JButton();
-        refreshRemoteTable.setIcon(new ImageIcon(getImageUrl("arrow_refresh.png"), "refresh"));
+        refreshRemoteTable.setIcon(new ImageIcon(IconHelper.getImageUrl("arrow_refresh.png"), "refresh"));
         topBoxPanel.add(refreshRemoteTable);
         topBoxPanel.add(Box.createRigidArea(new Dimension(10, 0)));
         refreshRemoteTable.addActionListener(actionEvent -> reloadServerRoutes());
 
         JButton downloadRemoteRoute = new JButton();
-        downloadRemoteRoute.setIcon(new ImageIcon(getImageUrl("arrow_down.png"), "download"));
+        downloadRemoteRoute.setIcon(new ImageIcon(IconHelper.getImageUrl("arrow_down.png"), "download"));
         topBoxPanel.add(downloadRemoteRoute);
 
         panelRight.add(topBoxPanel, BorderLayout.NORTH);
@@ -258,16 +256,15 @@ public class RoutesManagerPanel extends JPanel {
         topBoxPanel.add(Box.createRigidArea(new Dimension(30, 0)));
 
         JButton refreshLocalTable = new JButton();
-        refreshLocalTable.setIcon(new ImageIcon(getImageUrl("arrow_refresh.png"), "refresh"));
+        refreshLocalTable.setIcon(new ImageIcon(IconHelper.getImageUrl("arrow_refresh.png"), "refresh"));
         topBoxPanel.add(refreshLocalTable);
         topBoxPanel.add(Box.createRigidArea(new Dimension(10, 0)));
         refreshLocalTable.addActionListener(actionEvent -> {
-            AutoDriveRoutesManager autoDriveRoutesManager = readXmlRoutesMetaData();
-            lokalTable.setModel(new AutoDriveLocalRoutesTableModel(autoDriveRoutesManager != null ? autoDriveRoutesManager.getRoutes() : new ArrayList<>()));
+            reloadXMLRouteMetaData();
         });
 
         JButton downloadRemoteRoute = new JButton();
-        downloadRemoteRoute.setIcon(new ImageIcon(getImageUrl("arrow_up.png"), "upload"));
+        downloadRemoteRoute.setIcon(new ImageIcon(IconHelper.getImageUrl("arrow_up.png"), "upload"));
         topBoxPanel.add(downloadRemoteRoute);
 
         panelRight.add(topBoxPanel, BorderLayout.NORTH);
@@ -318,46 +315,10 @@ public class RoutesManagerPanel extends JPanel {
         return button;
     }
 
-    private URL getImageUrl(String imageName) {
-        String imgLocation = "/icons/" +imageName;
-        return RoutesManagerPanel.class.getResource(imgLocation);
+    public void reloadXMLRouteMetaData() {
+        AutoDriveRoutesManager autoDriveRoutesManager = readXmlRoutesMetaData();
+        lokalTable.setModel(new AutoDriveLocalRoutesTableModel(autoDriveRoutesManager != null ? autoDriveRoutesManager.getRoutes() : new ArrayList<>()));
     }
-
-    private void checkAndLoadProperties (){
-        File configFile = new File("adEditor.config");
-        if (configFile.exists()) {
-            try {
-                FileReader reader = new FileReader(configFile);
-                Properties props = new Properties();
-                props.load(reader);
-
-                String host = props.getProperty("routesPath");
-
-                System.out.print("Host name is: " + host);
-                reader.close();
-            } catch (FileNotFoundException ex) {
-                // file does not exist
-            } catch (IOException ex) {
-                // I/O error
-            }
-        }
-        else {
-            JFileChooser fc = new JFileChooser();
-
-            fc.setDialogTitle("Select Route Manager Directory");
-            fc.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
-            fc.setAcceptAllFileFilterUsed(false);
-//            FileNameExtensionFilter filter = new FileNameExtensionFilter("AutoDrive config", "xml");
-//            fc.addChoosableFileFilter(filter);
-            int returnVal = fc.showOpenDialog(this);
-
-            if (returnVal == JFileChooser.APPROVE_OPTION) {
-                File fileName = fc.getSelectedFile();
-               int x=1;
-            }
-        }
-    }
-
 
     private AutoDriveRoutesManager readXmlRoutesMetaData() {
 
@@ -366,7 +327,8 @@ public class RoutesManagerPanel extends JPanel {
             mapper.configure(MapperFeature.ACCEPT_CASE_INSENSITIVE_PROPERTIES, true);
             mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 
-            return mapper.readValue(new File(routesManagerPath), AutoDriveRoutesManager.class);
+            String gameDir = AdConfiguration.getInstance().getProperties().getProperty(AdConfiguration.LS19_GAME_DIRECTORY);
+            return mapper.readValue(new File(gameDir+routesManagerPath), AutoDriveRoutesManager.class);
         } catch (IOException e) {
             LOG.error(e.getMessage(), e);
             return null;
@@ -380,7 +342,8 @@ public class RoutesManagerPanel extends JPanel {
             mapper.configure(MapperFeature.ACCEPT_CASE_INSENSITIVE_PROPERTIES, true);
             mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 
-            mapper.writeValue(new File(routesManagerPath), autoDriveRoutesManager);
+            String gameDir = AdConfiguration.getInstance().getProperties().getProperty(AdConfiguration.LS19_GAME_DIRECTORY);
+            mapper.writeValue(new File(gameDir + routesManagerPath+"_2"), autoDriveRoutesManager);
         } catch (IOException e) {
             LOG.error(e.getMessage(), e);
         }
@@ -393,7 +356,8 @@ public class RoutesManagerPanel extends JPanel {
             mapper.configure(MapperFeature.ACCEPT_CASE_INSENSITIVE_PROPERTIES, true);
             mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 
-            return mapper.readValue(new File(routesDirectory + fileName), RouteExport.class);
+            String gameDir = AdConfiguration.getInstance().getProperties().getProperty(AdConfiguration.LS19_GAME_DIRECTORY);
+            return mapper.readValue(new File(gameDir + routesDirectory + fileName), RouteExport.class);
 
         } catch (IOException e) {
             LOG.error(e.getMessage(), e);
@@ -409,7 +373,8 @@ public class RoutesManagerPanel extends JPanel {
             mapper.configure(MapperFeature.ACCEPT_CASE_INSENSITIVE_PROPERTIES, true);
             mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 
-            mapper.writeValue(new File(routesDirectory + fileName), routeExport);
+            String gameDir = AdConfiguration.getInstance().getProperties().getProperty(AdConfiguration.LS19_GAME_DIRECTORY);
+            mapper.writeValue(new File(gameDir + routesDirectory + fileName), routeExport);
             return fileName;
         } catch (IOException e) {
             LOG.error(e.getMessage(), e);

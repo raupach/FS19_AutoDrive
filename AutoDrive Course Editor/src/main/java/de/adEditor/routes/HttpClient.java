@@ -2,11 +2,13 @@ package de.adEditor.routes;
 
 import com.google.gson.Gson;
 import de.adEditor.routes.dto.*;
+import de.adEditor.routes.events.ErrorMsg;
 import de.adEditor.routes.events.GetRoutesEvent;
 import de.adEditor.routes.events.HttpClientEventListener;
 import de.adEditor.routes.events.UploadCompletedEvent;
 import de.autoDrive.NetworkServer.rest.RoutesRestPath;
 import de.autoDrive.NetworkServer.rest.dto_v1.*;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hc.client5.http.async.methods.SimpleHttpRequest;
 import org.apache.hc.client5.http.async.methods.SimpleHttpRequests;
 import org.apache.hc.client5.http.async.methods.SimpleHttpResponse;
@@ -80,12 +82,14 @@ public class HttpClient {
                 @Override
                 public void failed(Exception ex) {
                     LOG.error(ex.getMessage(), ex);
+                    fireUploadCompletedEvent(new UploadCompletedEvent(new ErrorMsg(ex.getMessage())));
                 }
 
                 @Override
                 public void cancelled() {
                     long end = System.currentTimeMillis();
                     LOG.error("cancelled: {}ms", end - start);
+                    fireUploadCompletedEvent(new UploadCompletedEvent(new ErrorMsg("Operation canceled")));
                 }
 
             });
@@ -127,7 +131,9 @@ public class HttpClient {
             dto.setZ(Double.valueOf(z[i]));
             String[] oValue = out[i].split(",");
             for (String s : oValue) {
-                dto.getOut().add(Integer.valueOf(s));
+                if (StringUtils.isNotBlank(s)) {
+                    dto.getOut().add(Integer.valueOf(s));
+                }
             }
         }
 
@@ -160,18 +166,19 @@ public class HttpClient {
                 public void completed(SimpleHttpResponse response) {
                     String bodyText = response.getBodyText();
                     RoutesResponseDtos routesResponseDtos = gson.fromJson(bodyText, RoutesResponseDtos.class);
-//                    List<Route> route = toRoute(routesResponseDtos);
                     fireGetRouteEvent(new GetRoutesEvent(routesResponseDtos.getRoutes()));
                 }
 
                 @Override
                 public void failed(Exception ex) {
                     LOG.error(ex.getMessage(), ex);
+                    fireGetRouteEvent(new GetRoutesEvent(new ErrorMsg(ex.getMessage())));
                 }
 
                 @Override
                 public void cancelled() {
                     LOG.error("getRoutes cancelled.");
+                    fireGetRouteEvent(new GetRoutesEvent(new ErrorMsg("Operation canceled")));
                 }
 
             });
@@ -197,11 +204,13 @@ public class HttpClient {
                 @Override
                 public void failed(Exception ex) {
                     LOG.error(ex.getMessage(), ex);
+                    fireGetRouteEvent(new GetRoutesEvent(new ErrorMsg(ex.getMessage())));
                 }
 
                 @Override
                 public void cancelled() {
-                    LOG.error("getRoutes cancelled.");
+                    LOG.error("getWaypoints cancelled.");
+                    fireGetRouteEvent(new GetRoutesEvent(new ErrorMsg("Operation canceled")));
                 }
 
             });

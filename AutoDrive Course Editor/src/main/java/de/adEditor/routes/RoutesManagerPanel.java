@@ -8,6 +8,7 @@ import com.fasterxml.jackson.dataformat.xml.XmlMapper;
 import de.adEditor.config.AdConfiguration;
 import de.adEditor.helper.IconHelper;
 import de.adEditor.routes.dto.*;
+import de.adEditor.routes.events.ErrorMsg;
 import de.adEditor.routes.events.GetRoutesEvent;
 import de.adEditor.routes.events.HttpClientEventListener;
 import de.adEditor.routes.events.UploadCompletedEvent;
@@ -23,7 +24,6 @@ import javax.swing.*;
 import java.awt.*;
 import java.io.File;
 import java.io.IOException;
-import java.net.URL;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.List;
@@ -53,42 +53,57 @@ public class RoutesManagerPanel extends JPanel {
         httpClient.addMyEventListener(new HttpClientEventListener() {
             @Override
             public void getRoutes(GetRoutesEvent evt) {
-                remoteTable.setModel(new AutoDriveRemoteRoutesTableModel((List<RouteDto>) evt.getSource()));
+                setCursor(Cursor.getDefaultCursor());
+                if (evt.getSource() instanceof ErrorMsg) {
+                    ErrorMsg errorMsg = (ErrorMsg) evt.getSource();
+                    JOptionPane.showMessageDialog(null, errorMsg.getMsg(), "Error", JOptionPane.ERROR_MESSAGE);
+                } else {
+                    remoteTable.setModel(new AutoDriveRemoteRoutesTableModel((List<RouteDto>) evt.getSource()));
+                }
             }
 
             @Override
             public void getWaypoints(GetRoutesEvent evt) {
-                WaypointsResponseDto waypointsResponseDto = (WaypointsResponseDto) evt.getSource();
-                String filename = writeXmlRouteData(toRouteExport(waypointsResponseDto));
+                setCursor(Cursor.getDefaultCursor());
+                if (evt.getSource() instanceof ErrorMsg) {
+                    ErrorMsg errorMsg = (ErrorMsg) evt.getSource();
+                    JOptionPane.showMessageDialog(null, errorMsg.getMsg(), "Error", JOptionPane.ERROR_MESSAGE);
+                } else {
+                    WaypointsResponseDto waypointsResponseDto = (WaypointsResponseDto) evt.getSource();
+                    String filename = writeXmlRouteData(toRouteExport(waypointsResponseDto));
 
-                AutoDriveRoutesManager autoDriveRoutesManager = readXmlRoutesMetaData();
-                Route newRoute = new Route();
-                newRoute.setName(waypointsResponseDto.getRoute().getName());
-                newRoute.setRevision(waypointsResponseDto.getRoute().getRevision());
-                newRoute.setMap(waypointsResponseDto.getRoute().getMap());
-                SimpleDateFormat sdf = new SimpleDateFormat(RoutesRestPath.DATE_FORMAT);
-                try {
-                    newRoute.setDate(sdf.parse(waypointsResponseDto.getRoute().getDate()));
-                } catch (ParseException e) {
-                    LOG.error(e.getMessage(),e);
+                    AutoDriveRoutesManager autoDriveRoutesManager = readXmlRoutesMetaData();
+                    Route newRoute = new Route();
+                    newRoute.setName(waypointsResponseDto.getRoute().getName());
+                    newRoute.setRevision(waypointsResponseDto.getRoute().getRevision());
+                    newRoute.setMap(waypointsResponseDto.getRoute().getMap());
+                    SimpleDateFormat sdf = new SimpleDateFormat(RoutesRestPath.DATE_FORMAT);
+                    try {
+                        newRoute.setDate(sdf.parse(waypointsResponseDto.getRoute().getDate()));
+                    } catch (ParseException e) {
+                        LOG.error(e.getMessage(), e);
+                    }
+                    newRoute.setFileName(filename);
+                    newRoute.setServerId(waypointsResponseDto.getRoute().getId());
+                    Objects.requireNonNull(autoDriveRoutesManager).getRoutes().add(newRoute);
+                    writeXmlRoutesMetaData(autoDriveRoutesManager, filename);
+                    reloadXMLRouteMetaData();
                 }
-                newRoute.setFileName(filename);
-                newRoute.setServerId(waypointsResponseDto.getRoute().getId());
-                Objects.requireNonNull(autoDriveRoutesManager).getRoutes().add(newRoute);
-                writeXmlRoutesMetaData(autoDriveRoutesManager, filename);
             }
 
             @Override
             public void getUploadRouteResponse(UploadCompletedEvent evt) {
-
+                setCursor(Cursor.getDefaultCursor());
+                if (evt.getSource() instanceof ErrorMsg) {
+                    ErrorMsg errorMsg = (ErrorMsg) evt.getSource();
+                    JOptionPane.showMessageDialog(null, errorMsg.getMsg(), "Error", JOptionPane.ERROR_MESSAGE);
+                } else {
+                    reloadServerRoutes();
+                    JOptionPane.showMessageDialog(null, "Route successfully uploaded.");
+                }
             }
         });
 
-//        JToolBar toolBar = new JToolBar("Still draggable");
-//        addButtons(toolBar);
-
-//        setPreferredSize(new Dimension(450, 130));
-//        add(toolBar, BorderLayout.PAGE_START);
         createTable();
         reloadServerRoutes();
     }
@@ -132,7 +147,7 @@ public class RoutesManagerPanel extends JPanel {
     }
 
     private void reloadServerRoutes() {
-
+        setCursor(Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR));
         Runnable runnableTask = () -> {
             try {
                 httpClient.getRoutes();
@@ -154,6 +169,7 @@ public class RoutesManagerPanel extends JPanel {
 
     private void downloadWaypointsForRoute(String routeId) {
 
+        setCursor(Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR));
         Runnable runnableTask = () -> {
             try {
                 httpClient.getWaypoints(routeId);
@@ -273,48 +289,6 @@ public class RoutesManagerPanel extends JPanel {
     }
 
 
-    protected void addButtons(JToolBar toolBar) {
-        JButton button = null;
-
-        //first button
-        button = makeNavigationButton("arrow_refresh", "PREVIOUS",
-                "Back to previous something-or-other",
-                "Previous");
-        toolBar.add(button);
-
-        //second button
-        button = makeNavigationButton("arrow_up", "UP",
-                "Up to something-or-other",
-                "Up");
-        toolBar.add(button);
-
-
-    }
-
-    protected JButton makeNavigationButton(String imageName,
-                                           String actionCommand,
-                                           String toolTipText,
-                                           String altText) {
-        //Look for the image.
-        String imgLocation = "/" +imageName+ ".png";
-        URL imageURL = RoutesManagerPanel.class.getResource(imgLocation);
-
-        //Create and initialize the button.
-        JButton button = new JButton();
-        button.setActionCommand(actionCommand);
-        button.setToolTipText(toolTipText);
-//        button.addActionListener(this);
-
-        if (imageURL != null) {                      //image found
-            button.setIcon(new ImageIcon(imageURL, altText));
-        } else {                                     //no image found
-            button.setText(altText);
-            System.err.println("Resource not found: " + imgLocation);
-        }
-
-        return button;
-    }
-
     public void reloadXMLRouteMetaData() {
         AutoDriveRoutesManager autoDriveRoutesManager = readXmlRoutesMetaData();
         lokalTable.setModel(new AutoDriveLocalRoutesTableModel(autoDriveRoutesManager != null ? autoDriveRoutesManager.getRoutes() : new ArrayList<>()));
@@ -343,7 +317,7 @@ public class RoutesManagerPanel extends JPanel {
             mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 
             String gameDir = AdConfiguration.getInstance().getProperties().getProperty(AdConfiguration.LS19_GAME_DIRECTORY);
-            mapper.writeValue(new File(gameDir + routesManagerPath+"_2"), autoDriveRoutesManager);
+            mapper.writeValue(new File(gameDir + routesManagerPath), autoDriveRoutesManager);
         } catch (IOException e) {
             LOG.error(e.getMessage(), e);
         }
@@ -387,6 +361,7 @@ public class RoutesManagerPanel extends JPanel {
         AutoDriveLocalRoutesTableModel model = (AutoDriveLocalRoutesTableModel) lokalTable.getModel();
         Route route = model.get(row);
         RouteExport routeExport = readXmlRouteData(route.getFileName());
+        setCursor(Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR));
 
         Runnable runnableTask = () -> {
             try {

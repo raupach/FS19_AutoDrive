@@ -109,6 +109,7 @@ public class RoutesManagerPanel extends JPanel {
     }
 
     private RouteExport toRouteExport(WaypointsResponseDto waypointsResponseDto) {
+        int waypointCount = waypointsResponseDto.getWaypoints().size();
         RouteExport routeExport = new RouteExport();
         List<Double> x = new ArrayList<>();
         List<Double> y = new ArrayList<>();
@@ -117,23 +118,34 @@ public class RoutesManagerPanel extends JPanel {
         List<WaypointDto> waypointDtos = waypointsResponseDto.getWaypoints();
         Map<Integer,List<Integer>> inMap = new HashMap<>();
 
+        // Fill in-Map with default-value -1. In case of that we have no referencing out-node.
+        for (int i=1; i<=waypointCount; i++) {
+            List<Integer> initList = new ArrayList<>();
+            initList.add(-1);
+            inMap.put(i,initList);
+        }
+
         waypointDtos.forEach(waypointDto -> {
 
             x.add(waypointDto.getX());
             y.add(waypointDto.getY());
             z.add(waypointDto.getZ());
 
-            out.add(StringUtils.join(waypointDto.getOut(), ","));
+            out.add(waypointDto.getOut().isEmpty()?"-1":StringUtils.join(waypointDto.getOut(), ","));
 
             waypointDto.getOut().forEach(i ->{
-                List<Integer> in = inMap.computeIfAbsent(i, k -> new ArrayList<>());
+                List<Integer> in = inMap.get(i);
+
+                // remove the default value if its alone.
+                if (in.size()==1 && in.get(0).equals(-1)) {
+                    in.clear();
+                }
                 in.add((waypointDtos.indexOf(waypointDto))+1);
             });
-
         });
 
         Waypoints waypoints = new Waypoints();
-        waypoints.setC(waypointsResponseDto.getWaypoints().size());
+        waypoints.setC(waypointCount);
         waypoints.setX(StringUtils.join(x, ";"));
         waypoints.setY(StringUtils.join(y, ";"));
         waypoints.setZ(StringUtils.join(z, ";"));
@@ -142,7 +154,7 @@ public class RoutesManagerPanel extends JPanel {
 
         routeExport.setWaypoints(waypoints);
         routeExport.setGroups(waypointsResponseDto.getGroups().stream().map(g -> new Group(g.getName())).collect(Collectors.toList()));
-        routeExport.setMarkers(waypointsResponseDto.getMarkers().stream().map(m -> new Marker(m.getName(), m.getGroup(), m.getWaypointIndex())).collect(Collectors.toList()));
+        routeExport.setMarkers(waypointsResponseDto.getMarkers().stream().map(m -> new Marker(m.getName(), m.getGroup(), m.getWaypointIndex()+1)).collect(Collectors.toList()));
         return routeExport;
     }
 

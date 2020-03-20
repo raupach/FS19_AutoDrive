@@ -25,3 +25,6 @@ Switch to the Network Manager tab.
 On the left side are the local routes that were created with the route manager. On the right side are the routes on the server.
 If a route should be uploaded, it can be marked on the left. With a right mouse click a menu appears with Upload.
 The same on the right side. To download, mark a route and then right click download.
+
+![NetworkManager_Upload.png](images/NetworkManager_Upload.png)
+

@@ -39,7 +39,7 @@ public class RoutesManagerPanel extends JPanel {
 
     private final static String directory = "/autoDrive/routesManager";
     private final static String routesManagerPath = directory + "/routes.xml";
-    private final static String routesDirectory = directory + "/routes/";
+    private final static String routesDirectory = directory + "/routes";
 
     private HttpClient httpClient = new HttpClient();
     private ExecutorService executorService = Executors.newFixedThreadPool(10);
@@ -308,16 +308,27 @@ public class RoutesManagerPanel extends JPanel {
 
     private AutoDriveRoutesManager readXmlRoutesMetaData() {
 
-        try {
-            ObjectMapper mapper = new XmlMapper();
-            mapper.configure(MapperFeature.ACCEPT_CASE_INSENSITIVE_PROPERTIES, true);
-            mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+        String gameDir = AdConfiguration.getInstance().getProperties().getProperty(AdConfiguration.LS19_GAME_DIRECTORY);
+        File adDirectory = new File(gameDir + directory);
+        if (!adDirectory.exists()){
+            adDirectory.mkdirs();
+        }
 
-            String gameDir = AdConfiguration.getInstance().getProperties().getProperty(AdConfiguration.LS19_GAME_DIRECTORY);
-            return mapper.readValue(new File(gameDir+routesManagerPath), AutoDriveRoutesManager.class);
-        } catch (IOException e) {
-            LOG.error(e.getMessage(), e);
-            return null;
+        File adRoute = new File(gameDir + routesManagerPath);
+        if ( adRoute.exists()) {
+            try {
+                ObjectMapper mapper = new XmlMapper();
+                mapper.configure(MapperFeature.ACCEPT_CASE_INSENSITIVE_PROPERTIES, true);
+                mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+
+                return mapper.readValue(adRoute, AutoDriveRoutesManager.class);
+            } catch (IOException e) {
+                LOG.error(e.getMessage(), e);
+                return null;
+            }
+        }
+        else {
+            return new AutoDriveRoutesManager();
         }
     }
 
@@ -343,7 +354,7 @@ public class RoutesManagerPanel extends JPanel {
             mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 
             String gameDir = AdConfiguration.getInstance().getProperties().getProperty(AdConfiguration.LS19_GAME_DIRECTORY);
-            return mapper.readValue(new File(gameDir + routesDirectory + fileName), RouteExport.class);
+            return mapper.readValue(new File(gameDir + routesDirectory +"/"+ fileName), RouteExport.class);
 
         } catch (IOException e) {
             LOG.error(e.getMessage(), e);
@@ -353,14 +364,19 @@ public class RoutesManagerPanel extends JPanel {
 
     private String writeXmlRouteData(RouteExport routeExport) {
 
+        String gameDir = AdConfiguration.getInstance().getProperties().getProperty(AdConfiguration.LS19_GAME_DIRECTORY);
+        File adDirectory = new File(gameDir + routesDirectory);
+        if (!adDirectory.exists()){
+            adDirectory.mkdirs();
+        }
+
         try {
             String fileName = UUID.randomUUID().toString()+".xml";
             ObjectMapper mapper = new XmlMapper().enable(SerializationFeature.INDENT_OUTPUT);
             mapper.configure(MapperFeature.ACCEPT_CASE_INSENSITIVE_PROPERTIES, true);
             mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 
-            String gameDir = AdConfiguration.getInstance().getProperties().getProperty(AdConfiguration.LS19_GAME_DIRECTORY);
-            mapper.writeValue(new File(gameDir + routesDirectory + fileName), routeExport);
+            mapper.writeValue(new File(gameDir + routesDirectory +"/"+ fileName), routeExport);
             return fileName;
         } catch (IOException e) {
             LOG.error(e.getMessage(), e);

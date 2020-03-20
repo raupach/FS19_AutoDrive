@@ -44,8 +44,8 @@ public class HttpClient {
     private EventListenerList listenerList = new EventListenerList();
     private IOReactorConfig ioReactorConfig = IOReactorConfig.custom().setSoTimeout(Timeout.ofSeconds(300)).build();
 
-    private HttpHost target = new HttpHost("localhost", 8080);
-//    private HttpHost target = new HttpHost("autodrive.si12.de", 8294);
+//    private HttpHost target = new HttpHost("localhost", 8080);
+    private HttpHost target = new HttpHost("autodrive.si12.de", 8294);
 
     private static Logger LOG = LoggerFactory.getLogger(HttpClient.class);
 

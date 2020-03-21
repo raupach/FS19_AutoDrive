@@ -5,6 +5,7 @@ import de.adEditor.config.AdConfiguration;
 import de.adEditor.config.ConfigDialog;
 import de.adEditor.helper.IconHelper;
 import de.adEditor.routes.RoutesManagerPanel;
+import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.w3c.dom.Document;
@@ -64,6 +65,7 @@ public class AutoDriveEditor extends JFrame {
     private JRadioButton oneTimesMap;
     private JRadioButton fourTimesMap;
     private JRadioButton sixteenTimesMap;
+    private JTabbedPane tabPane;
 
     public int editorState = EDITORSTATE_NOOP;
     private File xmlConfigFile;
@@ -102,12 +104,12 @@ public class AutoDriveEditor extends JFrame {
         });
 
 
-        JTabbedPane tabpane = new JTabbedPane (JTabbedPane.TOP,JTabbedPane.SCROLL_TAB_LAYOUT );
-        add(tabpane);
+        tabPane = new JTabbedPane (JTabbedPane.TOP,JTabbedPane.SCROLL_TAB_LAYOUT );
+        add(tabPane);
         JPanel editorPanel = new JPanel();
         routesManagerPanel = new RoutesManagerPanel();
-        tabpane.addTab("Course Editor", new ImageIcon(IconHelper.getImageUrl("note_edit.png")) , editorPanel);
-        tabpane.addTab("Network Manager", new ImageIcon(IconHelper.getImageUrl("note_go.png")), routesManagerPanel);
+        tabPane.addTab("Course Editor", new ImageIcon(IconHelper.getImageUrl("note_edit.png")) , editorPanel);
+        tabPane.addTab("Network Manager", new ImageIcon(IconHelper.getImageUrl("note_go.png")), routesManagerPanel);
 
         editorPanel.setLayout(new BorderLayout());
 
@@ -222,7 +224,10 @@ public class AutoDriveEditor extends JFrame {
         menuBar.add(menu);
 
         JMenuItem menuConfigItem = new JMenuItem("Configuration");
-        menuConfigItem.addActionListener(e ->showConfigDialog());
+        menuConfigItem.addActionListener(e ->{
+            showConfigDialog();
+            enableManagerPanel();
+        });
         menu.add(menuConfigItem);
 
         JMenuItem menuQuitItem = new JMenuItem("Quit");
@@ -718,7 +723,17 @@ public class AutoDriveEditor extends JFrame {
         } else {
             showConfigDialog();
         }
-        routesManagerPanel.reloadXMLRouteMetaData();
+        enableManagerPanel();
+    }
+
+    private void enableManagerPanel() {
+        if ( StringUtils.isNotBlank(AdConfiguration.getInstance().getProperties().getProperty(AdConfiguration.LS19_GAME_DIRECTORY))) {
+            tabPane.setEnabledAt(1, true);
+            routesManagerPanel.reloadXMLRouteMetaData();
+        }
+        else {
+            tabPane.setEnabledAt(1, false);
+        }
     }
 
     private void showConfigDialog() {

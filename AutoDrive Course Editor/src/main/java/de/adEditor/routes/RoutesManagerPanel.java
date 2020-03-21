@@ -215,15 +215,11 @@ public class RoutesManagerPanel extends JPanel {
         JPopupMenu localPopupMenu = new JPopupMenu();
 
         JMenuItem menuItemUpload = new JMenuItem("Upload");
-        menuItemUpload.addActionListener(e ->{
-            startUploadRoute();
-        });
+        menuItemUpload.addActionListener(e -> startUploadRoute());
         localPopupMenu.add(menuItemUpload);
 
         JMenuItem menuItemRefresh = new JMenuItem("Refresh");
-        menuItemRefresh.addActionListener(e ->{
-            reloadXMLRouteMetaData();
-        });
+        menuItemRefresh.addActionListener(e -> reloadXMLRouteMetaData());
         localPopupMenu.add(menuItemRefresh);
 
         return localPopupMenu;
@@ -263,6 +259,7 @@ public class RoutesManagerPanel extends JPanel {
 
         JButton downloadRemoteRoute = new JButton();
         downloadRemoteRoute.setIcon(new ImageIcon(IconHelper.getImageUrl("arrow_down.png"), "download"));
+        downloadRemoteRoute.addActionListener(e -> downloadFullRoute());
         topBoxPanel.add(downloadRemoteRoute);
 
         panelRight.add(topBoxPanel, BorderLayout.NORTH);
@@ -287,13 +284,12 @@ public class RoutesManagerPanel extends JPanel {
         refreshLocalTable.setIcon(new ImageIcon(IconHelper.getImageUrl("arrow_refresh.png"), "refresh"));
         topBoxPanel.add(refreshLocalTable);
         topBoxPanel.add(Box.createRigidArea(new Dimension(10, 0)));
-        refreshLocalTable.addActionListener(actionEvent -> {
-            reloadXMLRouteMetaData();
-        });
+        refreshLocalTable.addActionListener(actionEvent -> reloadXMLRouteMetaData());
 
-        JButton downloadRemoteRoute = new JButton();
-        downloadRemoteRoute.setIcon(new ImageIcon(IconHelper.getImageUrl("arrow_up.png"), "upload"));
-        topBoxPanel.add(downloadRemoteRoute);
+        JButton uploadLocalRoute = new JButton();
+        uploadLocalRoute.setIcon(new ImageIcon(IconHelper.getImageUrl("arrow_up.png"), "upload"));
+        uploadLocalRoute.addActionListener(e->startUploadRoute());
+        topBoxPanel.add(uploadLocalRoute);
 
         panelRight.add(topBoxPanel, BorderLayout.NORTH);
 

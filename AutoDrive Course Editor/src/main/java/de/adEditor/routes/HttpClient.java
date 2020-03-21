@@ -58,10 +58,10 @@ public class HttpClient {
         listenerList.remove(HttpClientEventListener.class, listener);
     }
 
-    public void upload(RouteExport routeExport, String name, String map, Integer revision, Date date) throws ExecutionException, InterruptedException, IOException {
+    public void upload(RouteExport routeExport, String name, String map, Integer revision, Date date, String username) throws ExecutionException, InterruptedException, IOException {
 
         long start = System.currentTimeMillis();
-        RoutesRequestDto dto = toDto(routeExport, name, map, revision, date);
+        RoutesRequestDto dto = toDto(routeExport, name, map, revision, date, username);
 
         SimpleHttpRequest httppost = SimpleHttpRequests.post(target, RoutesRestPath.CONTEXT_PATH + "/" + RoutesRestPath.ROUTES);
 
@@ -100,12 +100,13 @@ public class HttpClient {
         }
     }
 
-    private RoutesRequestDto toDto(RouteExport routeExport, String name, String map, Integer revision, Date date) {
+    private RoutesRequestDto toDto(RouteExport routeExport, String name, String map, Integer revision, Date date, String username) {
         RoutesRequestDto dto = new RoutesRequestDto();
         dto.setDate(ZonedDateTime.ofInstant(date.toInstant(), ZoneId.systemDefault()).format(formatter));
         dto.setName(name);
         dto.setMap(map);
         dto.setRevision(revision);
+        dto.setUsername(username);
         dto.setGroups(routeExport.getGroups().stream().map(group -> toGroupDto(group)).collect(Collectors.toList()));
         dto.setMarkers(routeExport.getMarkers().stream().map(m -> toMarkerDto(m)).collect(Collectors.toList()));
         dto.setWaypoints(toWaypointDtos(routeExport.getWaypoints()));

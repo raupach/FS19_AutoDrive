@@ -1,6 +1,7 @@
 package de.adEditor.routes;
 
 
+import de.adEditor.routes.dto.GameSettings;
 import de.adEditor.routes.dto.Route;
 
 import javax.swing.event.TableModelListener;
@@ -12,12 +13,16 @@ import java.util.List;
 public class AutoDriveLocalRoutesTableModel implements TableModel {
 
     private List<Route> routes = new ArrayList<>();
+    private String username;
 
     public AutoDriveLocalRoutesTableModel() {
     }
 
-    public AutoDriveLocalRoutesTableModel(List<Route> routes) {
+    public AutoDriveLocalRoutesTableModel(List<Route> routes, GameSettings gameSettings) {
         this.routes = routes;
+        if ( gameSettings.getPlayer() != null) {
+            this.username = gameSettings.getPlayer().getName();
+        }
     }
 
     public Route get(int index) {
@@ -101,5 +106,9 @@ public class AutoDriveLocalRoutesTableModel implements TableModel {
     @Override
     public void removeTableModelListener(TableModelListener tableModelListener) {
 
+    }
+
+    public String getUsername() {
+        return username;
     }
 }

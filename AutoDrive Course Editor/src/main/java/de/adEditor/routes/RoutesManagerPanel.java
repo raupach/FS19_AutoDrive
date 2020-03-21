@@ -21,6 +21,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.swing.*;
+import javax.swing.table.JTableHeader;
 import java.awt.*;
 import java.io.File;
 import java.io.IOException;
@@ -40,6 +41,7 @@ public class RoutesManagerPanel extends JPanel {
     private final static String directory = "/autoDrive/routesManager";
     private final static String routesManagerPath = directory + "/routes.xml";
     private final static String routesDirectory = directory + "/routes";
+    private final static String gameSettings = "gameSettings.xml";
 
     private HttpClient httpClient = new HttpClient();
     private ExecutorService executorService = Executors.newFixedThreadPool(10);
@@ -198,6 +200,10 @@ public class RoutesManagerPanel extends JPanel {
         JPanel panelRight = createRightPanel();
 
         lokalTable = new JTable(new AutoDriveLocalRoutesTableModel());
+//        lokalTable.getColumnModel().getColumn(0).setPreferredWidth(500);
+//        lokalTable.getColumnModel().getColumn(1).setPreferredWidth(50);
+//        lokalTable.getColumnModel().getColumn(2).setPreferredWidth(20);
+//        lokalTable.getColumnModel().getColumn(3).setPreferredWidth(50);
         lokalTable.setComponentPopupMenu(createLocalRoutesPopupMenu());
 
         remoteTable = new JTable(new AutoDriveRemoteRoutesTableModel());
@@ -276,8 +282,8 @@ public class RoutesManagerPanel extends JPanel {
         topBoxPanel.setLayout(new BoxLayout(topBoxPanel, BoxLayout.LINE_AXIS));
         topBoxPanel.setBorder(BorderFactory.createEmptyBorder(15, 20, 10, 10));
 
-        JLabel remoteText = new JLabel("Lokal Routes:", JLabel.LEFT);
-        topBoxPanel.add(remoteText);
+        JLabel localText = new JLabel("Lokal Routes:", JLabel.LEFT);
+        topBoxPanel.add(localText);
         topBoxPanel.add(Box.createRigidArea(new Dimension(30, 0)));
 
         JButton refreshLocalTable = new JButton();
@@ -299,7 +305,8 @@ public class RoutesManagerPanel extends JPanel {
 
     public void reloadXMLRouteMetaData() {
         AutoDriveRoutesManager autoDriveRoutesManager = readXmlRoutesMetaData();
-        lokalTable.setModel(new AutoDriveLocalRoutesTableModel(autoDriveRoutesManager != null ? autoDriveRoutesManager.getRoutes() : new ArrayList<>()));
+        GameSettings gameSettings = readGameSettings();
+        lokalTable.setModel( new AutoDriveLocalRoutesTableModel(autoDriveRoutesManager.getRoutes(), gameSettings));
     }
 
     private AutoDriveRoutesManager readXmlRoutesMetaData() {
@@ -320,12 +327,27 @@ public class RoutesManagerPanel extends JPanel {
                 return mapper.readValue(adRoute, AutoDriveRoutesManager.class);
             } catch (IOException e) {
                 LOG.error(e.getMessage(), e);
-                return null;
             }
         }
-        else {
-            return new AutoDriveRoutesManager();
+        return new AutoDriveRoutesManager();
+    }
+
+    private GameSettings readGameSettings() {
+        String gameDir = AdConfiguration.getInstance().getProperties().getProperty(AdConfiguration.LS19_GAME_DIRECTORY);
+        File gameSettingsFile = new File(gameDir +"/"+ gameSettings);
+        if (gameSettingsFile.exists()) {
+
+            try {
+                ObjectMapper mapper = new XmlMapper();
+                mapper.configure(MapperFeature.ACCEPT_CASE_INSENSITIVE_PROPERTIES, true);
+                mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+
+                return mapper.readValue(gameSettingsFile, GameSettings.class);
+            } catch (IOException e) {
+                LOG.error(e.getMessage(), e);
+            }
         }
+        return new GameSettings();
     }
 
     private void writeXmlRoutesMetaData(AutoDriveRoutesManager autoDriveRoutesManager, String filename) {
@@ -383,13 +405,14 @@ public class RoutesManagerPanel extends JPanel {
     private void startUploadRoute() {
         int row = lokalTable.getSelectedRow();
         AutoDriveLocalRoutesTableModel model = (AutoDriveLocalRoutesTableModel) lokalTable.getModel();
+        String username = model.getUsername();
         Route route = model.get(row);
         RouteExport routeExport = readXmlRouteData(route.getFileName());
         setCursor(Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR));
 
         Runnable runnableTask = () -> {
             try {
-                httpClient.upload(routeExport, route.getName(), route.getMap(), route.getRevision(), route.getDate());
+                httpClient.upload(routeExport, route.getName(), route.getMap(), route.getRevision(), route.getDate(), username);
             } catch (ExecutionException | InterruptedException | IOException e) {
                 LOG.error(e.getMessage(), e);
             }

@@ -37,7 +37,7 @@ public class AutoDriveRemoteRoutesTableModel implements TableModel {
 
     @Override
     public int getColumnCount() {
-        return 5;
+        return 6;
     }
 
     @Override
@@ -50,8 +50,10 @@ public class AutoDriveRemoteRoutesTableModel implements TableModel {
             case 2:
                 return "map";
             case 3:
-                return "revision";
+                return "description";
             case 4:
+                return "revision";
+            case 5:
                 return "date";
             default:
                 return null;
@@ -64,10 +66,11 @@ public class AutoDriveRemoteRoutesTableModel implements TableModel {
             case 0:
             case 1:
             case 2:
-                return String.class;
             case 3:
-                return Integer.class;
+                return String.class;
             case 4:
+                return Integer.class;
+            case 5:
                 return Date.class;
             default:
                 return null;
@@ -91,8 +94,10 @@ public class AutoDriveRemoteRoutesTableModel implements TableModel {
             case 2:
                 return route.getMap();
             case 3:
-                return route.getRevision();
+                return route.getDescription();
             case 4:
+                return route.getRevision();
+            case 5:
                 SimpleDateFormat sdf = new SimpleDateFormat(RoutesRestPath.DATE_FORMAT);
                 try {
                     return  sdf.parse(route.getDate());

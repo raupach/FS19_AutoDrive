@@ -4,15 +4,13 @@ import de.adEditor.helper.IconHelper;
 
 import javax.swing.*;
 import java.awt.*;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
 import java.io.File;
 
 public class ConfigDialog extends JDialog {
 
     private JTextField ls19Directory;
 
-    public enum DIALOG_STATE  {OK, CANCELED};
+    public enum DIALOG_STATE {OK, CANCELED}
     private DIALOG_STATE state;
 
     public ConfigDialog(JFrame frame, boolean b) {
@@ -42,20 +40,17 @@ public class ConfigDialog extends JDialog {
         ls19Directory = new JTextField(15);
         ls19Directory.setText(AdConfiguration.getInstance().getProperties().getProperty(AdConfiguration.LS19_GAME_DIRECTORY));
         JButton fileChooserButton = new JButton(new ImageIcon(IconHelper.getImageUrl("folder.png")));
-        fileChooserButton.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent actionEvent) {
-                JFileChooser fc = new JFileChooser();
+        fileChooserButton.addActionListener(actionEvent -> {
+            JFileChooser fc = new JFileChooser();
 
-                fc.setDialogTitle("Select LS19 Directory");
-                fc.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
-                fc.setAcceptAllFileFilterUsed(false);
-                int returnVal = fc.showOpenDialog(frame);
+            fc.setDialogTitle("Select LS19 Directory");
+            fc.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
+            fc.setAcceptAllFileFilterUsed(false);
+            int returnVal = fc.showOpenDialog(frame);
 
-                if (returnVal == JFileChooser.APPROVE_OPTION) {
-                    File fileName = fc.getSelectedFile();
-                    ls19Directory.setText(fileName.getAbsolutePath());
-                }
+            if (returnVal == JFileChooser.APPROVE_OPTION) {
+                File fileName = fc.getSelectedFile();
+                ls19Directory.setText(fileName.getAbsolutePath());
             }
         });
         choosePanel.add(ls19Directory);

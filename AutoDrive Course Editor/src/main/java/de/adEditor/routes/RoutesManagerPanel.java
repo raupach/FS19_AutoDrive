@@ -10,18 +10,17 @@ import de.adEditor.helper.IconHelper;
 import de.adEditor.routes.dto.*;
 import de.adEditor.routes.events.ErrorMsg;
 import de.adEditor.routes.events.GetRoutesEvent;
-import de.adEditor.routes.events.HttpClientEventListener;
-import de.adEditor.routes.events.UploadCompletedEvent;
+import de.adEditor.routes.events.HttpClientEventAdapter;
 import de.autoDrive.NetworkServer.rest.RoutesRestPath;
 import de.autoDrive.NetworkServer.rest.dto_v1.RouteDto;
 import de.autoDrive.NetworkServer.rest.dto_v1.WaypointDto;
 import de.autoDrive.NetworkServer.rest.dto_v1.WaypointsResponseDto;
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.swing.*;
-import javax.swing.table.JTableHeader;
 import java.awt.*;
 import java.io.File;
 import java.io.IOException;
@@ -42,8 +41,8 @@ public class RoutesManagerPanel extends JPanel {
     private final static String routesManagerPath = directory + "/routes.xml";
     private final static String routesDirectory = directory + "/routes";
     private final static String gameSettings = "gameSettings.xml";
+    private final static String reloadCfn = "/reload.cfn";
 
-    private HttpClient httpClient = new HttpClient();
     private ExecutorService executorService = Executors.newFixedThreadPool(10);
 
     private JTable lokalTable;
@@ -52,7 +51,7 @@ public class RoutesManagerPanel extends JPanel {
     public RoutesManagerPanel() {
         super(new BorderLayout());
 
-        httpClient.addMyEventListener(new HttpClientEventListener() {
+        HttpClient.getInstance().addMyEventListener(new HttpClientEventAdapter() {
             @Override
             public void getRoutes(GetRoutesEvent evt) {
                 setCursor(Cursor.getDefaultCursor());
@@ -90,20 +89,10 @@ public class RoutesManagerPanel extends JPanel {
                     Objects.requireNonNull(autoDriveRoutesManager).getRoutes().add(newRoute);
                     writeXmlRoutesMetaData(autoDriveRoutesManager, filename);
                     reloadXMLRouteMetaData();
+                    touchReloadCfn();
                 }
             }
 
-            @Override
-            public void getUploadRouteResponse(UploadCompletedEvent evt) {
-                setCursor(Cursor.getDefaultCursor());
-                if (evt.getSource() instanceof ErrorMsg) {
-                    ErrorMsg errorMsg = (ErrorMsg) evt.getSource();
-                    JOptionPane.showMessageDialog(null, errorMsg.getMsg(), "Error", JOptionPane.ERROR_MESSAGE);
-                } else {
-                    reloadServerRoutes();
-                    JOptionPane.showMessageDialog(null, "Route successfully uploaded.");
-                }
-            }
         });
 
         createTable();
@@ -164,7 +153,7 @@ public class RoutesManagerPanel extends JPanel {
         setCursor(Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR));
         Runnable runnableTask = () -> {
             try {
-                httpClient.getRoutes();
+                HttpClient.getInstance().getRoutes();
             } catch (ExecutionException | InterruptedException | IOException e) {
                 LOG.error(e.getMessage(), e);
             }
@@ -186,7 +175,7 @@ public class RoutesManagerPanel extends JPanel {
         setCursor(Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR));
         Runnable runnableTask = () -> {
             try {
-                httpClient.getWaypoints(routeId);
+                HttpClient.getInstance().getWaypoints(routeId);
             } catch (ExecutionException | InterruptedException | IOException e) {
                 LOG.error(e.getMessage(), e);
             }
@@ -408,16 +397,19 @@ public class RoutesManagerPanel extends JPanel {
         String username = model.getUsername();
         Route route = model.get(row);
         RouteExport routeExport = readXmlRouteData(route.getFileName());
-        setCursor(Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR));
 
-        Runnable runnableTask = () -> {
-            try {
-                httpClient.upload(routeExport, route.getName(), route.getMap(), route.getRevision(), route.getDate(), username);
-            } catch (ExecutionException | InterruptedException | IOException e) {
-                LOG.error(e.getMessage(), e);
-            }
-        };
-        executorService.execute(runnableTask);
+        UploadDialog uploadDialog = new UploadDialog((JFrame) SwingUtilities.getWindowAncestor(this), route, routeExport, username);
+        uploadDialog.setVisible(true);
+        reloadServerRoutes();
     }
 
+    private void touchReloadCfn () {
+        String gameDir = AdConfiguration.getInstance().getProperties().getProperty(AdConfiguration.LS19_GAME_DIRECTORY);
+        File reloadCfnFile = new File(gameDir + directory + reloadCfn);
+        try {
+            FileUtils.touch(reloadCfnFile);
+        } catch (IOException e) {
+            LOG.error(e.getMessage(), e);
+        }
+    }
 }

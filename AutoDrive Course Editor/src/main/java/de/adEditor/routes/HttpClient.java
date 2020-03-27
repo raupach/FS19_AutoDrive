@@ -43,12 +43,20 @@ public class HttpClient {
     private Gson gson = new Gson();
     private EventListenerList listenerList = new EventListenerList();
     private IOReactorConfig ioReactorConfig = IOReactorConfig.custom().setSoTimeout(Timeout.ofSeconds(300)).build();
+    private static HttpClient instance = null;
 
 //    private HttpHost target = new HttpHost("localhost", 8080);
     private HttpHost target = new HttpHost("autodrive.si12.de", 8294);
 
     private static Logger LOG = LoggerFactory.getLogger(HttpClient.class);
 
+
+    public static HttpClient getInstance() {
+        if (instance == null) {
+            instance = new HttpClient();
+        }
+        return instance;
+    }
 
     public void addMyEventListener(HttpClientEventListener listener) {
         listenerList.add(HttpClientEventListener.class, listener);
@@ -58,10 +66,10 @@ public class HttpClient {
         listenerList.remove(HttpClientEventListener.class, listener);
     }
 
-    public void upload(RouteExport routeExport, String name, String map, Integer revision, Date date, String username) throws ExecutionException, InterruptedException, IOException {
+    public void upload(RouteExport routeExport, String name, String map, Integer revision, Date date, String username, String description) throws ExecutionException, InterruptedException, IOException {
 
         long start = System.currentTimeMillis();
-        RoutesRequestDto dto = toDto(routeExport, name, map, revision, date, username);
+        RoutesRequestDto dto = toDto(routeExport, name, map, revision, date, username, description);
 
         SimpleHttpRequest httppost = SimpleHttpRequests.post(target, RoutesRestPath.CONTEXT_PATH + "/" + RoutesRestPath.ROUTES);
 
@@ -100,13 +108,14 @@ public class HttpClient {
         }
     }
 
-    private RoutesRequestDto toDto(RouteExport routeExport, String name, String map, Integer revision, Date date, String username) {
+    private RoutesRequestDto toDto(RouteExport routeExport, String name, String map, Integer revision, Date date, String username, String description) {
         RoutesRequestDto dto = new RoutesRequestDto();
         dto.setDate(ZonedDateTime.ofInstant(date.toInstant(), ZoneId.systemDefault()).format(formatter));
         dto.setName(name);
         dto.setMap(map);
         dto.setRevision(revision);
         dto.setUsername(username);
+        dto.setDescription(StringUtils.substring(description, 0, 2999));
         dto.setGroups(routeExport.getGroups().stream().map(group -> toGroupDto(group)).collect(Collectors.toList()));
         dto.setMarkers(routeExport.getMarkers().stream().map(m -> toMarkerDto(m)).collect(Collectors.toList()));
         dto.setWaypoints(toWaypointDtos(routeExport.getWaypoints()));
